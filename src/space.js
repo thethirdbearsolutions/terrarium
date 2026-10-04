@@ -1,41 +1,14 @@
 // The room. The camera stands at the center of a ring; windows stand on the
 // ring facing in. At the ring's radius one CSS pixel is one screen pixel, so a
-// window you are looking straight at is as sharp as a flat page.
+// window you are looking straight at is as sharp as a flat page. All around is
+// the desktop color; the floor carries the desktop pattern.
 
 import * as THREE from 'three';
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+import * as desktop from './desktop.js';
 
 const FOV = 50;
-
-const SKY_VERT = `
-varying vec3 vDir;
-void main() {
-  vDir = normalize(position);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-const SKY_FRAG = `
-varying vec3 vDir;
-uniform float uTime;
-float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-void main() {
-  float y = vDir.y;
-  vec3 deep = vec3(0.012, 0.03, 0.07);
-  vec3 mid = vec3(0.03, 0.12, 0.2);
-  vec3 glow = vec3(0.1, 0.32, 0.38);
-  vec3 col = mix(mid, deep, smoothstep(0.0, 0.7, y));
-  col = mix(col, glow, exp(-abs(y) * 9.0) * 0.55);
-  col = mix(col, vec3(0.01, 0.025, 0.04), smoothstep(0.0, -0.5, y));
-  float az = atan(vDir.z, vDir.x);
-  float band = sin(az * 3.0 + uTime * 0.03 + sin(az * 7.0) * 0.4) * 0.5 + 0.5;
-  float aur = exp(-pow((y - 0.28 - band * 0.12) * 7.0, 2.0));
-  col += vec3(0.05, 0.22, 0.17) * aur * (0.35 + 0.35 * band);
-  vec3 cell = floor(vDir * 300.0);
-  float s = hash(cell);
-  float star = step(0.9975, s) * smoothstep(0.02, 0.25, y);
-  col += vec3(star) * (0.5 + 0.5 * sin(uTime * 1.5 + s * 80.0));
-  gl_FragColor = vec4(col, 1.0);
-}`;
+const FLOOR_BIT = 7;   // world px per pattern bit on the floor
 
 export class Space {
   constructor(glRoot, cssRoot) {
@@ -49,12 +22,11 @@ export class Space {
     this.scene = new THREE.Scene();
     this.cssScene = new THREE.Scene();
 
-    this.skyMat = new THREE.ShaderMaterial({ vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, uniforms: { uTime: { value: 0 } }, side: THREE.BackSide, depthWrite: false });
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(40000, 48, 32), this.skyMat);
-    this.scene.add(this.sky);
-
-    this.floor = new THREE.Group();
+    this.floorMat = new THREE.MeshBasicMaterial();
+    this.floor = new THREE.Mesh(new THREE.CircleGeometry(1, 96), this.floorMat);
+    this.floor.rotation.x = -Math.PI / 2;
     this.scene.add(this.floor);
+    this.setDesktop(desktop.load());
 
     this.pan = 0; this.panTarget = 0;
     this.over = 0; this.overTarget = 0;
@@ -76,20 +48,31 @@ export class Space {
     this.buildFloor();
   }
 
+  /** The floor reaches far enough to meet the sky; one pattern bit is FLOOR_BIT across. */
   buildFloor() {
-    this.floor.clear();
-    const D = this.D, y = -0.62 * D;
-    const mat = (o) => new THREE.LineBasicMaterial({ color: 0x8fe3d6, transparent: true, opacity: o });
-    for (let i = 1; i <= 8; i++) {
-      const r = D * 0.5 * i, pts = [];
-      for (let a = 0; a <= 128; a++) pts.push(new THREE.Vector3(Math.cos(a / 128 * Math.PI * 2) * r, y, Math.sin(a / 128 * Math.PI * 2) * r));
-      this.floor.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat(i === 2 ? 0.32 : 0.12 / (1 + (i - 2) * 0.25))));
-    }
-    for (let k = 0; k < 24; k++) {
-      const a = k / 24 * Math.PI * 2;
-      const pts = [new THREE.Vector3(Math.cos(a) * D * 0.5, y, Math.sin(a) * D * 0.5), new THREE.Vector3(Math.cos(a) * D * 4, y, Math.sin(a) * D * 4)];
-      this.floor.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat(0.07)));
-    }
+    const D = this.D, R = Math.min(D * 30, 50000);
+    this.floor.position.y = -0.62 * D;
+    this.floor.scale.set(R, R, 1);
+    const t = this.floorMat.map;
+    if (t) t.repeat.set(2 * R / (8 * FLOOR_BIT), 2 * R / (8 * FLOOR_BIT));
+  }
+
+  /** { color, pattern } */
+  setDesktop(d) {
+    this.desktop = d;
+    this.scene.background = new THREE.Color(d.color);
+    document.body.style.background = d.color;
+    document.body.classList.toggle('light', d.color === '#c0c0c0');
+    this.floorMat.map?.dispose();
+    const t = new THREE.CanvasTexture(desktop.tile(d));
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.anisotropy = this.gl.capabilities.getMaxAnisotropy();
+    this.floorMat.map = t;
+    this.floorMat.needsUpdate = true;
+    this.buildFloor();
   }
 
   /** Where a point on the ring sits: angle theta (0 = straight ahead at pan 0,
@@ -108,8 +91,6 @@ export class Space {
     const back = 1.7 * D * e, up = 1.05 * D * e;
     this.camera.position.set(-Math.sin(this.pan) * back, up, Math.cos(this.pan) * back);
     this.camera.rotation.set(-0.5 * e, -this.pan, 0);
-    this.skyMat.uniforms.uTime.value = t;
-    this.sky.position.copy(this.camera.position);
   }
 
   render() {
