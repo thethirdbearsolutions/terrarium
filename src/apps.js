@@ -10,7 +10,7 @@ const icon = (body) => `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/s
 export const APPS = [
   {
     id: 'hardreturn', title: 'Hard Return', w: 820, h: 560,
-    url: at('/hardreturn/', null), accepts: ['.hr', '.txt'],
+    url: at('/hardreturn/', 'https://hardreturn.vercel.app/'), accepts: ['.hr', '.txt'],
     icon: icon(`<rect x="8" y="5" width="32" height="38" rx="2" fill="#1d2fa6"/><rect x="8" y="38" width="32" height="5" fill="#9aa4b8"/>
       <path d="M13 13h22M13 18h18M13 23h22M13 28h12" stroke="#c9cfdf" stroke-width="2.4"/><path d="M33 26v6h-7l2.5-2.5M26 32l2.5 2.5" stroke="#fff" stroke-width="2.2" fill="none"/>`),
   },
