@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terrarium</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M6 12 Q16 2 26 12 V26 H6Z%27 fill=%27%23bfe6e0%27 stroke=%27%23205a63%27 stroke-width=%272%27/%3E%3Cpath d=%27M9 24 q3-7 6-1 q3-9 7 1%27 fill=%27none%27 stroke=%27%232f8a4c%27 stroke-width=%272%27/%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #e9f1f4; --dim: #9fb2bb; --glass: rgba(18, 30, 42, .72); --line: rgba(190, 230, 240, .22);
+    --bar-a: #3a5266; --bar-b: #24384a; --bar-focus-a: #3f7290; --bar-focus-b: #285068;
+    --face: #f3f4f1; --edge: #6d8796;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050a12; color: var(--ink);
+    font: 13px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #gl, #css { position: fixed; inset: 0; }
+  #gl canvas { display: block; }
+  body.dragging iframe, body.panning iframe { pointer-events: none; }
+  body.panning { cursor: grabbing; }
+
+  .win { position: relative; transform-style: preserve-3d; }
+  .win .face { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--face); color: #1b2228; border-radius: 9px 9px 4px 4px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 18px 50px rgba(0,0,0,.45); }
+  .win .face.front { transform: translateZ(var(--half)); }
+  .win .face.back { transform: rotateY(180deg) translateZ(var(--half)); background: #d9ddd6; }
+  .win .edge { position: absolute; background: linear-gradient(90deg, #4c6575, var(--edge), #4c6575); }
+  .win .edge.l, .win .edge.r { top: 6px; bottom: 3px; width: var(--thick); }
+  .win .edge.l { left: calc(var(--half) * -1); transform: rotateY(-90deg); }
+  .win .edge.r { right: calc(var(--half) * -1); transform: rotateY(90deg); }
+  .win .edge.t, .win .edge.b { left: 6px; right: 6px; height: var(--thick); background: linear-gradient(#4c6575, var(--edge), #4c6575); }
+  .win .edge.t { top: calc(var(--half) * -1); transform: rotateX(90deg); }
+  .win .edge.b { bottom: calc(var(--half) * -1); transform: rotateX(-90deg); }
+
+  .bar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 9px; flex: none;
+    background: linear-gradient(var(--bar-a), var(--bar-b)); color: #e6eef2; cursor: grab; user-select: none;
+    border-bottom: 1px solid rgba(0,0,0,.4); }
+  .win.focused .bar { background: linear-gradient(var(--bar-focus-a), var(--bar-focus-b)); color: #fff; }
+  .bar .icon { width: 16px; height: 16px; flex: none; }
+  .bar .title { font-weight: 600; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .dirty { color: #ffd479; font-weight: 700; display: none; }
+  .win.dirty .bar .dirty { display: inline; }
+  .bar .spacer { flex: 1; }
+  .bar button { font: 13px/1 system-ui, sans-serif; width: 22px; height: 20px; padding: 0; border-radius: 5px; cursor: pointer;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; }
+  .bar button:hover { background: rgba(255,255,255,.24); }
+  .bar button.close:hover { background: #b3433a; }
+  .face .body { flex: 1; min-height: 0; display: flex; position: relative; }
+  .face iframe { flex: 1; border: 0; background: #000; width: 100%; height: 100%; }
+  .face .grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.25) 50%, transparent 62%, rgba(0,0,0,.25) 62%, transparent 74%); }
+  .face.back textarea { flex: 1; border: 0; padding: 14px; resize: none; background: #e7eae2; color: #2a3036;
+    font: 14px/1.5 "Marker Felt", "Segoe Print", "Comic Sans MS", cursive; }
+  .win .shield { position: absolute; inset: 0; display: none; cursor: pointer; }
+  .win.parked .shield, .win.overview .shield { display: block; }
+
+  /* built-in apps */
+  .files { flex: 1; display: flex; min-width: 0; font-size: 13px; }
+  .files .side { width: 140px; flex: none; background: #e3e8ea; border-right: 1px solid #c8d0d4; padding: 8px 0; }
+  .files .side div { padding: 5px 12px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+  .files .side div.on { background: #c3d6e0; font-weight: 600; }
+  .files .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .files .tools { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #d5dbde; background: #eef1f1; align-items: center; }
+  .files .tools button, .dialog button { font: inherit; padding: 3px 10px; border-radius: 5px; border: 1px solid #9fb0b8; background: #fff; cursor: pointer; }
+  .files .tools button:disabled { opacity: .45; cursor: default; }
+  .files .tools .where { color: #5b6b73; margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .files .list { flex: 1; overflow: auto; }
+  .files table { width: 100%; border-collapse: collapse; }
+  .files td, .files th { padding: 4px 10px; text-align: left; white-space: nowrap; }
+  .files th { font-weight: 600; color: #5b6b73; font-size: 12px; border-bottom: 1px solid #e0e5e7; position: sticky; top: 0; background: var(--face); }
+  .files tr.f { cursor: default; }
+  .files tr.f:hover td { background: #edf3f6; }
+  .files tr.f.sel td { background: #c9dfea; }
+  .files td.n { width: 100%; }
+  .files td.s, .files td.d { color: #67777f; font-size: 12px; }
+  .files .empty { padding: 30px; color: #8a979d; text-align: center; }
+  .clockface { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#fcfdfb, #dfe6e4); }
+  .clockface .t { font: 600 44px/1 ui-monospace, Menlo, monospace; color: #1f3644; }
+  .clockface .d { margin-top: 8px; color: #5b6b73; }
+
+  .dialog .face { background: #f6f7f4; }
+  .dialog .row { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid #d5dbde; background: #eef1f1; }
+  .dialog .row input { flex: 1; font: inherit; padding: 4px 6px; border: 1px solid #9fb0b8; border-radius: 4px; }
+  .dialog .row .msg { flex: 1; }
+  .dialog button.primary { background: #285068; border-color: #1c3a4c; color: #fff; }
+  .dialog .ask { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 14px; }
+
+  /* dock */
+  #dock-wrap { position: fixed; left: 0; right: 0; bottom: 0; height: 96px; perspective: 700px; pointer-events: none; display: flex; justify-content: center; align-items: flex-end; }
+  #dock { pointer-events: auto; display: flex; align-items: flex-end; gap: 6px; padding: 8px 14px 10px; margin-bottom: 8px;
+    background: linear-gradient(rgba(60, 96, 116, .55), rgba(16, 30, 42, .82)); border: 1px solid var(--line); border-radius: 14px;
+    transform: rotateX(24deg); transform-origin: bottom center; box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.2); }
+  #dock .app { width: 52px; height: 52px; border-radius: 12px; border: 0; padding: 6px; cursor: pointer; position: relative;
+    background: linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.04)); transition: transform .18s; }
+  #dock .app:hover { transform: translateY(-8px) translateZ(20px) scale(1.12); }
+  #dock .app svg { width: 100%; height: 100%; display: block; }
+  #dock .app.running::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #9ff0e4; box-shadow: 0 0 6px #9ff0e4; }
+  #dock .app .tip { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: var(--glass); border: 1px solid var(--line); color: var(--ink); font-size: 12px; display: none; }
+  #dock .app:hover .tip { display: block; }
+  #dock .sep { width: 1px; align-self: stretch; margin: 4px 6px; background: var(--line); }
+  #dock .nav { width: 34px; height: 34px; margin-bottom: 9px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--ink); cursor: pointer; font-size: 15px; }
+  #dock .nav:hover, #dock .nav.on { background: rgba(160, 240, 228, .25); }
+  #dock .clock { margin: 0 4px 16px 8px; color: var(--ink); font: 600 13px ui-monospace, Menlo, monospace; min-width: 44px; text-align: right; }
+
+  #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(40, 120, 140, .25); border: 3px dashed rgba(160, 240, 228, .7); font-size: 20px; pointer-events: none; }
+  body.dropping #drop { display: flex; }
+</style>
+</head>
+<body>
+<div id="gl"></div>
+<div id="css"></div>
+<div id="dock-wrap"><div id="dock"></div></div>
+<div id="drop">Drop to copy into /Documents</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

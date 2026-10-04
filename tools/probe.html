@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>probe</title>
+<body style="font:13px system-ui;padding:10px">
+<textarea id="t" style="width:95%;height:120px">hello from the probe</textarea>
+<pre id="log"></pre>
+<script>
+const log = (x) => (document.getElementById('log').textContent += JSON.stringify(x) + '\n');
+let n = 0; const waiting = {};
+const ask = (type, rest) => new Promise(r => { const id = ++n; waiting[id] = r; parent.postMessage({ terrarium: 1, type, id, ...rest }, '*'); });
+addEventListener('message', (e) => {
+  const m = e.data; if (m?.terrarium !== 1) return;
+  if (m.type === 'reply') { waiting[m.id]?.(m); return; }
+  log(m);
+});
+parent.postMessage({ terrarium: 1, type: 'hello', title: 'Probe', accepts: ['.txt'] }, '*');
+window.probe = { ask, log };
+</script>
