@@ -4,12 +4,12 @@
 import * as fs from './fs.js';
 import { APPS, appById, appForName } from './apps.js';
 import { Win, THICK } from './window.js';
-import { resolve } from './collide.js';
+import { Body, step } from './physics.js';
 import { mountFiles, mountClock, fileDialog, ask, importFiles, exportFile } from './files.js';
 
 const LAYOUT_KEY = 'terrarium.layout';
 const BUILTIN = { files: mountFiles, clock: mountClock };
-const GAP = 36;   // air between windows that would otherwise touch
+const ROOM = { near: 0.55, far: 2.8 };   // the walls, as multiples of the ring's radius
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** A dialog rides in front of the window that asked for it. */
@@ -77,7 +77,7 @@ export class Shell {
 
   unpark(w) {
     w.parked = false;
-    w.theta = this.space.pan; w.y = -30; w.turn = 0;
+    w.theta = this.space.pan; w.y = -30; w.turn = 0; w.depth = 0; w.resync = true;
     this.focus(w);
     this.saveLayout();
   }
@@ -129,26 +129,55 @@ export class Shell {
   }
 
   update(dt) {
-    const sp = this.space;
+    const sp = this.space, D = sp.D;
     const shelf = this.wins.filter(w => w.parked);
-    const targets = new Map(this.wins.map(w => [w, w.target(shelf.indexOf(w))]));
+    const live = this.wins.filter(w => !w.parked);
 
-    // Windows are solid: the one in your hand wins, then the most recently
-    // focused, and anything in their way is moved out of it
-    const rank = (w) => (w.dragging ? -1 : this.order.includes(w) ? this.order.indexOf(w) : this.order.length);
-    const bodies = this.wins.filter(w => !w.parked).sort((a, b) => rank(a) - rank(b)).map(w => {
-      const t = targets.get(w), p = sp.ringPos(t.theta, t.y, t.r);
-      return { w, x: p.x, z: p.z, y: t.y, hw: w.w / 2, hh: w.h / 2, ht: THICK / 2, yaw: -t.theta - t.turn };
-    });
-    resolve(bodies, { gap: GAP, eye: { x: 0, z: 0 } });
-    for (const b of bodies) {
-      const t = targets.get(b.w);
-      t.theta += wrap(Math.atan2(b.x, -b.z) - t.theta);
-      t.r = Math.max(sp.D * 0.6, Math.hypot(b.x, b.z));
+    for (const w of live) {
+      const hand = this.handPose(w);
+      if (!w.slab || w.resync) {
+        w.slab = new Body(hand);
+        w.resync = false;
+      }
+      const b = w.slab;
+      b.hw = w.w / 2; b.hh = w.h / 2; b.ht = THICK / 2; b.y = w.y;
+      if (w.dragging) {
+        // held: it goes where the hand puts it, at whatever speed that takes
+        b.kinematic = true;
+        b.vx = (hand.x - b.x) / dt; b.vz = (hand.z - b.z) / dt; b.w = wrap(hand.yaw - b.yaw) / dt;
+        const a = 0.35;
+        w.fling = w.fling
+          ? { vx: w.fling.vx + (b.vx - w.fling.vx) * a, vz: w.fling.vz + (b.vz - w.fling.vz) * a, w: w.fling.w + (b.w - w.fling.w) * a }
+          : { vx: b.vx, vz: b.vz, w: b.w };
+      } else if (b.kinematic) {
+        // let go: thrown with the hand's recent speed
+        b.kinematic = false;
+        Object.assign(b, w.fling || { vx: 0, vz: 0, w: 0 });
+        w.fling = null;
+      }
     }
 
-    for (const w of this.wins) w.update(dt, targets.get(w));
+    step(live.map(w => w.slab), dt, { near: ROOM.near * D, far: ROOM.far * D });
+
+    let moving = false;
+    for (const w of live) {
+      const b = w.slab;
+      if (w.dragging) continue;
+      w.theta = Math.atan2(b.x, -b.z);
+      w.depth = Math.hypot(b.x, b.z) - D;
+      w.turn = wrap(-b.yaw - w.theta);
+      moving ||= b.moving;
+    }
+    if (moving) this.saveLayout();
+
+    for (const w of this.wins) w.update(dt, w.target(shelf.indexOf(w)));
     for (const d of this.dialogs) d.update(dt, d.target());
+  }
+
+  /** Where a window's own numbers put it on the floor. */
+  handPose(w) {
+    const r = this.space.D + w.depth;
+    return { x: r * Math.sin(w.theta), z: -r * Math.cos(w.theta), yaw: -w.theta - w.turn, y: w.y };
   }
 
   // ---- files ---------------------------------------------------------------

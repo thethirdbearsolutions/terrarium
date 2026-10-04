@@ -46,7 +46,7 @@ app that speaks it.
 
 - `src/space.js` the room: camera, sky, floor, turning, stepping back
 - `src/window.js` a window: faces, edges, dragging, the shelf
-- `src/collide.js` keeping windows out of each other
+- `src/physics.js` windows as rigid bodies: impacts, spin, friction, the walls
 - `src/shell.js` focus, dialogs, opening files, the protocol, saving the layout
 - `src/files.js` Files, the Open and Save As dialogs
 - `src/fs.js` the filesystem, in IndexedDB

@@ -55,7 +55,7 @@ export class Win {
     for (const face of [this.front, this.back]) {
       const bar = face.querySelector('.bar');
       bar.addEventListener('pointerdown', (e) => this.barDown(e));
-      bar.addEventListener('wheel', (e) => { e.preventDefault(); this.depth = Math.max(-200, Math.min(2400, this.depth + e.deltaY * 1.2)); shell.saveLayout(); }, { passive: false });
+      bar.addEventListener('wheel', (e) => { e.preventDefault(); this.depth = Math.max(-200, Math.min(2400, this.depth + e.deltaY * 1.2)); this.resync = true; shell.saveLayout(); }, { passive: false });
       bar.addEventListener('contextmenu', (e) => e.preventDefault());
       face.querySelectorAll('button').forEach(b => {
         b.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -115,7 +115,7 @@ export class Win {
     const move = (ev) => {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
       if (turning) {
-        this.turn = Math.max(-1.3, Math.min(1.3, start.turn + dx / 220));
+        this.turn = start.turn + dx / 220;
       } else {
         const r = D + this.depth;
         this.theta = start.theta + dx * this.scale / r;
@@ -170,8 +170,14 @@ export class Win {
   update(dt, target) {
     const t = { scale: 1, ...target };
     if (!this.cur) this.cur = { ...t, r: t.r + 900, flip: t.flip };
+    // glide in from wherever it was (opening, the shelf); once there, the
+    // world moves it, so follow exactly or the eye sees it lag its collisions
     const k = 1 - Math.exp(-dt * 10);
-    for (const key of ['theta', 'y', 'r', 'turn', 'flip', 'scale']) this.cur[key] += (t[key] - this.cur[key]) * k;
+    const far = Math.abs(t.theta - this.cur.theta) > 0.02 || Math.abs(t.r - this.cur.r) > 20 || Math.abs(t.y - this.cur.y) > 20;
+    if (far || this.parked) this.gliding = true;
+    else if (!this.parked) this.gliding = false;
+    for (const key of ['theta', 'y', 'r', 'turn']) this.cur[key] += (t[key] - this.cur[key]) * (this.gliding ? k : 1);
+    for (const key of ['flip', 'scale']) this.cur[key] += (t[key] - this.cur[key]) * k;
     const c = this.cur, sp = this.shell.space;
     this.el.classList.toggle('parked', this.parked);
     this.el.classList.toggle('overview', sp.overTarget > 0);
