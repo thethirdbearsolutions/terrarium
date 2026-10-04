@@ -32,7 +32,7 @@ export const APPS = [
   },
   {
     id: 'turtlebloom', title: 'Turtle Bloom', w: 900, h: 600,
-    url: at('/turtlebloom/', null), accepts: ['.logo'],
+    url: at('/turtlebloom/', 'https://turtlebloom.vercel.app/'), accepts: ['.logo'],
     icon: icon(`<ellipse cx="24" cy="38" rx="18" ry="5" fill="#5bb06a"/><ellipse cx="22" cy="26" rx="12" ry="9" fill="#3f8a4f"/><path d="M14 24l8-6 8 6M18 30l4-5 4 5" stroke="#2b6036" stroke-width="1.6" fill="none"/><circle cx="36" cy="24" r="4" fill="#8bd07a"/><circle cx="12" cy="12" r="4" fill="#f27fb2"/><circle cx="12" cy="12" r="1.6" fill="#ffe36b"/>`),
   },
   {
