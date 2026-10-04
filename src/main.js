@@ -28,6 +28,7 @@ function hiddenBehindWall(e) {
 }
 
 function grabWorld(e) {
+  const ev0 = e;
   const sx = e.clientX, yaw0 = space.player.yaw;
   let moved = false;
   document.body.classList.add('panning');
@@ -42,7 +43,11 @@ function grabWorld(e) {
   const up = () => {
     removeEventListener('pointermove', move); removeEventListener('pointerup', up);
     document.body.classList.remove('panning');
-    if (!moved && space.overTarget) shell.setOverview(false);
+    if (!moved && space.overTarget) {
+      // on the map, a click near a window's footprint goes to it
+      const pt = space.pickFloor(ev0.clientX, ev0.clientY), w = pt && shell.windowAt(pt);
+      if (w) shell.shieldClick(w); else shell.setOverview(false);
+    }
     shell.saveLayout();
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up);

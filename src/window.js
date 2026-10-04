@@ -7,7 +7,6 @@ import { Vector3, Quaternion } from 'three';
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { GLYPH } from './icons.js';
 import { popup, closeMenus, menuBar, offsetIn, openMenu } from './menu.js';
-import { MAP_GROW, MAP_TILT } from './space.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const UP = new Vector3(0, 1, 0);
@@ -383,14 +382,7 @@ export class Win {
     this.obj.position.set(c.x, c.y, c.z);
     this.obj.scale.setScalar(c.scale);
     if (c.local) this.obj.quaternion.copy(cam.quaternion).multiply(new Quaternion().setFromAxisAngle(UP, c.turn + c.flip));
-    else if (sp.mapness > 0 && !this.maximized) {
-      // on the map every window turns up to face you, bigger, so you can see them all and pick one
-      const m = sp.mapness, grow = 1 + (MAP_GROW - 1) * m;
-      yaw = wrap(yaw - wrap(c.yaw) * m);
-      this.obj.scale.setScalar(c.scale * grow);
-      this.obj.position.y = c.y + m * (this.h * (grow - 1) / 2 + 120);
-      this.obj.rotation.set(MAP_TILT * m, yaw, 0, 'YXZ');
-    } else this.obj.rotation.set(0, yaw, 0, 'YXZ');
+    else this.obj.rotation.set(0, yaw, 0, 'YXZ');
 
     // CSS backface culling is not dependable through these transforms: show
     // the face that points at the camera and hide the other

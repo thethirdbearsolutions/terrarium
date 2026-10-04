@@ -26,8 +26,6 @@ export const CEIL_Y = 760;
 const MAP_PITCH = -1.08;        // how steeply the map looks down
 const MAP_WALLS = 0.28;         // how tall the walls stand in the map, as a share
 const FOG = { near: 2600, far: 17000 };
-export const MAP_GROW = 2.4;    // windows on the map stand this much bigger, turned up to face you
-export const MAP_TILT = -0.75;
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const ease = (t) => t * t * (3 - 2 * t);
@@ -134,7 +132,48 @@ export class Space {
     this.marker.visible = false;
     this.scene.add(this.marker);
 
+    // every window's footprint, on the map: where it stands, how wide, and a
+    // notch on the side it faces, so one seen edge-on from above still reads
+    this.footprints = new THREE.Group();
+    this.footprints.visible = false;
+    this.scene.add(this.footprints);
+    this.footMat = new THREE.MeshBasicMaterial({ color: 0x000080, fog: false, depthTest: false, side: THREE.DoubleSide });
+    const notch = new THREE.Shape();
+    notch.moveTo(-90, 0); notch.lineTo(90, 0); notch.lineTo(0, 130); notch.closePath();
+    this.notchGeo = new THREE.ShapeGeometry(notch).rotateX(Math.PI / 2);
+
     this.scene.fog = new THREE.Fog(0x000000, FOG.near, FOG.far);
+  }
+
+  /** Lay each window's footprint on the floor: [{ x, z, yaw, w }]. */
+  setFootprints(list) {
+    const g = this.footprints;
+    while (g.children.length > list.length) g.remove(g.children[g.children.length - 1]);
+    while (g.children.length < list.length) {
+      const f = new THREE.Group();
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(1, 70).rotateX(-Math.PI / 2), this.footMat);
+      const tip = new THREE.Mesh(this.notchGeo, this.footMat);
+      tip.position.z = 35;
+      f.add(bar, tip);
+      f.renderOrder = 19;
+      bar.renderOrder = tip.renderOrder = 19;
+      g.add(f);
+    }
+    list.forEach((it, i) => {
+      const f = g.children[i];
+      f.position.set(it.x, FLOOR_Y + 20, it.z);
+      f.rotation.set(0, it.yaw, 0);
+      f.children[0].scale.x = it.w;
+    });
+  }
+
+  /** The point on the floor under the pointer, or null. */
+  pickFloor(clientX, clientY) {
+    const ndc = new THREE.Vector2(clientX / innerWidth * 2 - 1, -(clientY / innerHeight) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const hit = new THREE.Vector3();
+    return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y), hit) ? hit : null;
   }
 
   /** { color, pattern, walls } */
@@ -264,6 +303,7 @@ export class Space {
     this.marker.position.x = p.x; this.marker.position.z = p.z;
     this.marker.rotation.y = p.yaw;
     this.marker.scale.setScalar(Math.max(0.01, e));
+    this.footprints.visible = e > 0.02;
     this.scene.fog.near = FOG.near + e * 60000; this.scene.fog.far = FOG.far + e * 90000;
   }
 

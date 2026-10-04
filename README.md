@@ -29,7 +29,7 @@ one (Program Manager, File Manager, Control Panel, Clock).
 | drag the floor | turn |
 | scroll on the floor | walk forward, back |
 | click a title bar | walk up to that window and stand square in front of it |
-| O, or Window ▸ Step Back | the map; click a window there to walk to it; O or Esc to come down |
+| O, or Window ▸ Step Back | the map, with every window where it really stands and a mark on the floor for the way it faces; click a window or its mark to walk to it; O or Esc to come down |
 
 Walls stop you; windows you walk into get knocked out of the way. Any
 movement key stops a walk that's taking you somewhere.
@@ -77,7 +77,7 @@ with its ring standing in the starting room.
 wall sizes, how many walls are knocked out for loops, the starting room
 and how many other rooms. The same seed gives the same maze on every
 visit. Walking speeds are `MOVE` in `src/player.js`; the map's angle, how
-far its walls sink and how much its windows grow are at the top of
+and how far its walls sink are at the top of
 `src/space.js`.
 
 ![Round a corner](shots/maze-corner.png)

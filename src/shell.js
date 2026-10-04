@@ -188,6 +188,22 @@ export class Shell {
   }
 
   /** Go and stand square in front of a window, where it's sharp. */
+  /** Windows standing in the maze: not minimized, not maximized. */
+  inMaze() { return this.wins.filter(w => w.cur && !w.minimized && !w.maximized); }
+
+  /** The window whose footprint is nearest a floor point, if one is close. */
+  windowAt(pt, reach = 260) {
+    let best = null, bd = reach;
+    for (const w of this.inMaze()) {
+      const ux = Math.cos(w.cur.yaw), uz = -Math.sin(w.cur.yaw);
+      const dx = pt.x - w.cur.x, dz = pt.z - w.cur.z;
+      const along = Math.max(-w.w / 2, Math.min(w.w / 2, dx * ux + dz * uz));
+      const d = Math.hypot(dx - ux * along, dz - uz * along);
+      if (d < bd) { bd = d; best = w; }
+    }
+    return best;
+  }
+
   bring(w) {
     if (w.minimized) return this.restore(w);
     this.focus(w);
@@ -375,6 +391,7 @@ export class Shell {
 
     sp.update(dt);
     for (const w of this.wins) w.update(dt, w.target(icons.indexOf(w)));
+    if (sp.mapness > 0) sp.setFootprints(this.inMaze().map(w => ({ x: w.cur.x, z: w.cur.z, yaw: w.cur.yaw, w: w.w })));
     for (const d of this.dialogs) d.update(dt, d.target());
   }
 

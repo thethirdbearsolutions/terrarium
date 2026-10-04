@@ -141,23 +141,17 @@ export async function freeName(dir, name) {
 export async function seed() {
   for (const r of ROOTS) await mkdir(r);
   if (localStorage.getItem('terrarium.seeded')) return;
+  // one line per paragraph: whatever opens it does the wrapping
   await write('/Documents/Welcome.txt', [
     'Terrarium',
     '',
-    'Walk with the arrow keys or W A S D; Alt+arrows step sideways. Drag the',
-    'floor to turn, scroll to walk. Click the floor first if an app has the',
-    'keys, or press Esc in one of the built-in ones.',
+    'Walk with the arrow keys or W A S D; Alt+arrows step sideways. Drag the floor to turn, scroll to walk. Click the floor first if an app has the keys, or press Esc in one of the built-in ones.',
     '',
-    'Program Manager starts things: double-click an icon. Double-click the',
-    'floor, or press Ctrl+Esc, for the Task List.',
+    'Program Manager starts things: double-click an icon. Double-click the floor, or press Ctrl+Esc, for the Task List.',
     '',
-    'Drag a window by its title bar, or by its border to size it. Scroll on the',
-    'title bar to push it away or pull it near; right-drag the bar to turn it.',
-    'Click a title bar to walk up to its window. The box at the left of the',
-    'title bar opens the control menu; Turn Around shows the back, which you',
-    'can write on.',
+    'Drag a window by its title bar, or by its border to size it. Scroll on the title bar to push it away or pull it near; right-drag the bar to turn it. Click a title bar to walk up to its window. The box at the left of the title bar opens the control menu; Turn Around shows the back, which you can write on.',
     '',
-    'Step Back, in Program Manager\'s Window menu (or O), shows the map.',
+    'Step Back, in Program Manager\'s Window menu (or O), shows the map. Click a window or the mark under it to walk there.',
     '',
     'Files dropped onto the floor land in c:\\documents.',
   ].join('\n'));
