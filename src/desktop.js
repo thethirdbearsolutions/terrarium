@@ -21,7 +21,7 @@ export const PATTERNS = [
   { name: 'Drizzle', rows: ['10000000', '10000000', '00000000', '00001000', '00001000', '00000000', '00100000', '00000000'] },
 ];
 
-export const WALLS = ['Panels'];
+export const WALLS = ['Panels', 'Brick', 'Stone'];
 
 export const DEFAULT = { color: '#008080', pattern: 'Sprouts', walls: 'Panels' };
 
