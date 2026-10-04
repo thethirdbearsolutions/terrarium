@@ -1,47 +1,11 @@
 import { Space } from './space.js';
 import { Shell, APPS } from './shell.js';
+import { closeMenus, menuOpen } from './menu.js';
 import * as fs from './fs.js';
 
 const space = new Space(document.getElementById('gl'), document.getElementById('css'));
 const shell = new Shell(space);
 window.__terrarium = { space, shell, fs, APPS };
-
-// ---- dock ------------------------------------------------------------------
-
-const dock = document.getElementById('dock');
-dock.innerHTML = APPS.map(a => `<button class="app" data-app="${a.id}">${a.icon}<span class="tip">${a.title}</span></button>`).join('')
-  + `<span class="sep"></span><button class="nav" data-nav="left" title="Turn left">◀</button><button class="nav" data-nav="over" title="Step back">◎</button><button class="nav" data-nav="right" title="Turn right">▶</button><span class="clock"></span>`;
-
-dock.addEventListener('click', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.nav) return nav(b.dataset.nav);
-  const app = APPS.find(a => a.id === b.dataset.app);
-  const mine = shell.order.concat(shell.wins.filter(w => !shell.order.includes(w))).filter(w => w.app.id === app.id);
-  if (shell.space.overTarget) shell.setOverview(false);
-  // first click brings the one you have; a click on the one already in front opens another
-  const top = mine[0];
-  const centered = top && !top.parked && shell.order[0] === top && Math.abs(Math.sin(top.theta - space.panTarget)) < 0.15;
-  if (top && !centered && !e.shiftKey) shell.bring(top);
-  else shell.launch(app);
-});
-
-shell.onWindows = () => {
-  const running = new Set(shell.wins.map(w => w.app.id));
-  dock.querySelectorAll('.app').forEach(b => b.classList.toggle('running', running.has(b.dataset.app)));
-  dock.querySelector('[data-nav="over"]').classList.toggle('on', space.overTarget > 0);
-};
-
-const clock = dock.querySelector('.clock');
-const tick = () => { clock.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
-tick(); setInterval(tick, 10000);
-
-function nav(n) {
-  const step = space.hfov * 0.6;
-  if (n === 'left') space.panTarget -= step;
-  else if (n === 'right') space.panTarget += step;
-  else if (n === 'over') shell.setOverview(!space.overTarget);
-  shell.saveLayout();
-}
 
 // ---- turning the room --------------------------------------------------------
 
@@ -53,6 +17,7 @@ addEventListener('pointerdown', (e) => {
   const sx = e.clientX, p0 = space.panTarget;
   let moved = false;
   document.body.classList.add('panning');
+  if (document.activeElement?.tagName === 'IFRAME') document.activeElement.blur();
   const move = (ev) => {
     const dx = ev.clientX - sx;
     if (Math.abs(dx) > 3) moved = true;
@@ -67,6 +32,9 @@ addEventListener('pointerdown', (e) => {
   addEventListener('pointermove', move); addEventListener('pointerup', up);
 });
 
+// double-click the desktop for the Task List
+addEventListener('dblclick', (e) => { if (isBackground(e.target) && !space.overTarget) shell.taskList(); });
+
 addEventListener('wheel', (e) => {
   if (!isBackground(e.target)) return;
   e.preventDefault();
@@ -75,9 +43,17 @@ addEventListener('wheel', (e) => {
 }, { passive: false });
 
 addEventListener('keydown', (e) => {
-  if (document.activeElement && document.activeElement !== document.body) return;
-  if (e.key === 'ArrowLeft') nav('left');
-  else if (e.key === 'ArrowRight') nav('right');
+  if (menuOpen()) return;
+  const a = document.activeElement;
+  if (a?.tagName === 'IFRAME') return;
+  // the shell's own keys, wherever in the shell the focus is
+  if (e.key === 'Escape' && e.ctrlKey) shell.taskList();
+  else if (e.code === 'Space' && e.altKey) { const w = shell.top; if (w) { shell.bring(w); w.toggleMenu(); } }
+  else if (e.key === 'F4' && e.ctrlKey) { const w = shell.top; if (w) shell.close(w); }
+  else if (shell.top?.onKey?.(e)) { /* the window took it */ }
+  else if (a && a !== document.body && !a.classList.contains('sys')) return;
+  else if (e.key === 'ArrowLeft') shell.turn(-1);
+  else if (e.key === 'ArrowRight') shell.turn(1);
   else if (e.key === 'o' || e.key === 'Escape') shell.setOverview(e.key === 'o' ? !space.overTarget : false);
   else return;
   e.preventDefault();
@@ -97,8 +73,8 @@ addEventListener('drop', (e) => {
 // ---- go --------------------------------------------------------------------------
 
 await fs.seed();
-await shell.restore();
-shell.onWindows();
+await shell.restoreLayout();
+closeMenus();
 
 let last = performance.now();
 function frame(now) {

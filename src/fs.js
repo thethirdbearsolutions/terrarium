@@ -33,6 +33,8 @@ async function tx(mode, fn) {
 export const ext = (name) => { const i = name.lastIndexOf('.'); return i > 0 ? name.slice(i).toLowerCase() : ''; };
 export const basename = (path) => path.slice(path.lastIndexOf('/') + 1);
 export const dirname = (path) => path.slice(0, path.lastIndexOf('/')) || '/';
+/** How a path reads on the c: drive: /Documents/Letter.hr is c:\\documents\\letter.hr */
+export const dosPath = (path) => ('c:' + (path === '/' ? '\\' : path.replace(/\//g, '\\'))).toLowerCase();
 export const mimeFor = (name) => MIME[ext(name)] || 'text/plain';
 
 function norm(path) {
@@ -120,6 +122,13 @@ export async function rename(from, to) {
   changed(to);
 }
 
+/** The record at path, matching names in any case, or null. */
+export async function find(path) {
+  const p = norm('/' + path.replace(/^\/+/, '')).toLowerCase();
+  const all = await tx('readonly', s => s.getAll());
+  return all.find(f => f.path.toLowerCase() === p) || null;
+}
+
 /** A name in dir that doesn't collide: "letter.hr", "letter 2.hr", ... */
 export async function freeName(dir, name) {
   const e = ext(name), stem = e ? name.slice(0, -e.length) : name;
@@ -135,12 +144,18 @@ export async function seed() {
   await write('/Documents/Welcome.txt', [
     'Terrarium',
     '',
-    'Drag the empty space to turn around. The dock at the bottom starts things.',
-    'Drag a window by its bar. Scroll on the bar to push it away or pull it near.',
-    'Right-drag the bar to turn it. ⇄ shows the back. ▭ puts it on the shelf.',
-    '◎ steps back to see the whole room.',
+    'Drag the empty desktop to turn around. Program Manager starts things:',
+    'double-click an icon. Double-click the desktop, or press Ctrl+Esc, for',
+    'the Task List.',
     '',
-    'Files dropped onto the room land in /Documents.',
+    'Drag a window by its title bar, or by its border to size it. Scroll on the',
+    'title bar to push it away or pull it near; right-drag the bar to turn it.',
+    'The box at the left of the title bar opens the control menu; Turn Around',
+    'shows the back, which you can write on.',
+    '',
+    'Step Back, in Program Manager\'s Window menu, shows the whole room.',
+    '',
+    'Files dropped onto the room land in c:\\documents.',
   ].join('\n'));
   try { localStorage.setItem('terrarium.seeded', '1'); } catch {}
 }
