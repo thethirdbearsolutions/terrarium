@@ -24,6 +24,9 @@ the shell frames the local copies. Deployed, it frames the deployed apps.
 - ⇄ shows the back of a window, which you can write on.
 - ▭ puts a window on the shelf at the left edge; click it to bring it back.
 - The corner grip resizes.
+- Windows are solid. One that would pass through another is pushed back or
+  aside instead; the one in your hand, then the one you last used, holds its
+  place.
 - Files dropped onto the room land in `/Documents`.
 
 The layout, the notes on the backs, and the files persist in the browser.
@@ -35,10 +38,15 @@ to open and save files, set its title, and say when it has unsaved
 changes: see [PROTOCOL.md](PROTOCOL.md). `tools/probe.html` is a minimal
 app that speaks it.
 
+## Tests
+
+    node --test test/*.test.mjs
+
 ## Layout
 
 - `src/space.js` the room: camera, sky, floor, turning, stepping back
 - `src/window.js` a window: faces, edges, dragging, the shelf
+- `src/collide.js` keeping windows out of each other
 - `src/shell.js` focus, dialogs, opening files, the protocol, saving the layout
 - `src/files.js` Files, the Open and Save As dialogs
 - `src/fs.js` the filesystem, in IndexedDB

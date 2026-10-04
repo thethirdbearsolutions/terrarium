@@ -3,11 +3,14 @@
 
 import * as fs from './fs.js';
 import { APPS, appById, appForName } from './apps.js';
-import { Win } from './window.js';
+import { Win, THICK } from './window.js';
+import { resolve } from './collide.js';
 import { mountFiles, mountClock, fileDialog, ask, importFiles, exportFile } from './files.js';
 
 const LAYOUT_KEY = 'terrarium.layout';
 const BUILTIN = { files: mountFiles, clock: mountClock };
+const GAP = 36;   // air between windows that would otherwise touch
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** A dialog rides in front of the window that asked for it. */
 class Dialog extends Win {
@@ -126,12 +129,26 @@ export class Shell {
   }
 
   update(dt) {
-    // rank: 0 for the focused window, then back in focus order
-    const live = this.order.filter(w => !w.parked);
-    this.wins.forEach(w => { w.rank = live.indexOf(w); if (w.rank < 0) w.rank = live.length; });
+    const sp = this.space;
     const shelf = this.wins.filter(w => w.parked);
-    for (const w of this.wins) w.update(dt, shelf.indexOf(w));
-    for (const d of this.dialogs) d.update(dt, 0);
+    const targets = new Map(this.wins.map(w => [w, w.target(shelf.indexOf(w))]));
+
+    // Windows are solid: the one in your hand wins, then the most recently
+    // focused, and anything in their way is moved out of it
+    const rank = (w) => (w.dragging ? -1 : this.order.includes(w) ? this.order.indexOf(w) : this.order.length);
+    const bodies = this.wins.filter(w => !w.parked).sort((a, b) => rank(a) - rank(b)).map(w => {
+      const t = targets.get(w), p = sp.ringPos(t.theta, t.y, t.r);
+      return { w, x: p.x, z: p.z, y: t.y, hw: w.w / 2, hh: w.h / 2, ht: THICK / 2, yaw: -t.theta - t.turn };
+    });
+    resolve(bodies, { gap: GAP, eye: { x: 0, z: 0 } });
+    for (const b of bodies) {
+      const t = targets.get(b.w);
+      t.theta += wrap(Math.atan2(b.x, -b.z) - t.theta);
+      t.r = Math.max(sp.D * 0.6, Math.hypot(b.x, b.z));
+    }
+
+    for (const w of this.wins) w.update(dt, targets.get(w));
+    for (const d of this.dialogs) d.update(dt, d.target());
   }
 
   // ---- files ---------------------------------------------------------------

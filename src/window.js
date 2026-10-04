@@ -4,8 +4,7 @@
 
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 
-const THICK = 14;
-const STACK = 70;          // how far back each window behind the focused one sits
+export const THICK = 14;
 const SHELF_TURN = 1.25;   // radians a shelved window turns to show its edge
 const SHELF_NEAR = 0.4;    // the shelf's distance, as a fraction of the ring's
 
@@ -25,7 +24,6 @@ export class Win {
     this.title = app.title;
     this.file = s.file || null;   // what it was opened with, if anything
     this.dirty = false;
-    this.rank = 0;
     this.cur = null;              // eased state, set on first update
 
     const el = document.createElement('div');
@@ -102,13 +100,14 @@ export class Win {
   }
 
   /** Screen pixels to ring units at this window's distance. */
-  get scale() { return (this.shell.space.D + this.depth + this.rank * STACK) / this.shell.space.D; }
+  get scale() { const D = this.shell.space.D; return (this.cur?.r ?? D + this.depth) / D; }
 
   barDown(e) {
     if (e.target.tagName === 'BUTTON' || this.parked) return;
     e.preventDefault(); e.stopPropagation();
     this.shell.focus(this);
     const turning = e.button === 2 || e.altKey;
+    this.dragging = true;
     const sx = e.clientX, sy = e.clientY;
     const start = { theta: this.theta, y: this.y, turn: this.turn };
     const D = this.shell.space.D;
@@ -126,6 +125,7 @@ export class Win {
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       document.body.classList.remove('dragging');
+      this.dragging = false;
       this.shell.saveLayout();
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
@@ -134,6 +134,7 @@ export class Win {
   gripDown(e) {
     e.preventDefault(); e.stopPropagation();
     this.shell.focus(this);
+    this.dragging = true;
     const sx = e.clientX, sy = e.clientY, w0 = this.w, h0 = this.h, th0 = this.theta, y0 = this.y;
     const D = this.shell.space.D;
     document.body.classList.add('dragging');
@@ -147,13 +148,14 @@ export class Win {
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       document.body.classList.remove('dragging');
+      this.dragging = false;
       this.frame?.contentWindow?.postMessage({ terrarium: 1, type: 'resized', w: this.w, h: this.h - 28 }, '*');
       this.shell.saveLayout();
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   }
 
-  /** Where this window wants to be right now. */
+  /** Where this window would stand if nothing were in its way. */
   target(shelfIndex) {
     const sp = this.shell.space;
     if (this.parked) {
@@ -161,11 +163,12 @@ export class Win {
       // in front of the ring, so no window can cover it, and shrunk to match
       return { theta: edge + 0.1 + shelfIndex * 0.1, y: -20, r: sp.D * SHELF_NEAR, turn: SHELF_TURN, flip: 0, scale: SHELF_NEAR * 0.5 };
     }
-    return { theta: this.theta, y: this.y, r: sp.D + this.depth + this.rank * STACK, turn: this.turn, flip: this.flipped ? Math.PI : 0 };
+    return { theta: this.theta, y: this.y, r: sp.D + this.depth, turn: this.turn, flip: this.flipped ? Math.PI : 0 };
   }
 
-  update(dt, shelfIndex) {
-    const t = { scale: 1, ...this.target(shelfIndex) };
+  /** Ease toward t, where the shell has decided this window goes. */
+  update(dt, target) {
+    const t = { scale: 1, ...target };
     if (!this.cur) this.cur = { ...t, r: t.r + 900, flip: t.flip };
     const k = 1 - Math.exp(-dt * 10);
     for (const key of ['theta', 'y', 'r', 'turn', 'flip', 'scale']) this.cur[key] += (t[key] - this.cur[key]) * k;
