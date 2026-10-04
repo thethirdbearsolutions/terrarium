@@ -62,6 +62,7 @@ export class Space {
     this.desktop = d;
     this.scene.background = new THREE.Color(d.color);
     document.body.style.background = d.color;
+    document.body.style.setProperty('--desk', d.color);
     document.body.classList.toggle('light', d.color === '#c0c0c0');
     this.floorMat.map?.dispose();
     const t = new THREE.CanvasTexture(desktop.tile(d));
