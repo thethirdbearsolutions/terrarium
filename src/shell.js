@@ -106,7 +106,6 @@ export class Shell {
 
   setOverview(on) {
     this.space.overTarget = on ? 1 : 0;
-    this.wins.forEach(w => w.el.classList.toggle('overview', on));
     this.onWindows?.();
   }
 

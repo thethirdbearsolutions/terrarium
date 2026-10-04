@@ -7,6 +7,7 @@ import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 const THICK = 14;
 const STACK = 70;          // how far back each window behind the focused one sits
 const SHELF_TURN = 1.25;   // radians a shelved window turns to show its edge
+const SHELF_NEAR = 0.4;    // the shelf's distance, as a fraction of the ring's
 
 let nextId = 1;
 
@@ -157,18 +158,22 @@ export class Win {
     const sp = this.shell.space;
     if (this.parked) {
       const edge = sp.pan - sp.hfov / 2;
-      return { theta: edge + 0.1 + shelfIndex * 0.06, y: -40, r: sp.D + 700, turn: SHELF_TURN, flip: 0 };
+      // in front of the ring, so no window can cover it, and shrunk to match
+      return { theta: edge + 0.1 + shelfIndex * 0.1, y: -20, r: sp.D * SHELF_NEAR, turn: SHELF_TURN, flip: 0, scale: SHELF_NEAR * 0.5 };
     }
     return { theta: this.theta, y: this.y, r: sp.D + this.depth + this.rank * STACK, turn: this.turn, flip: this.flipped ? Math.PI : 0 };
   }
 
   update(dt, shelfIndex) {
-    const t = this.target(shelfIndex);
+    const t = { scale: 1, ...this.target(shelfIndex) };
     if (!this.cur) this.cur = { ...t, r: t.r + 900, flip: t.flip };
     const k = 1 - Math.exp(-dt * 10);
-    for (const key of ['theta', 'y', 'r', 'turn', 'flip']) this.cur[key] += (t[key] - this.cur[key]) * k;
+    for (const key of ['theta', 'y', 'r', 'turn', 'flip', 'scale']) this.cur[key] += (t[key] - this.cur[key]) * k;
     const c = this.cur, sp = this.shell.space;
+    this.el.classList.toggle('parked', this.parked);
+    this.el.classList.toggle('overview', sp.overTarget > 0);
     this.obj.position.copy(sp.ringPos(c.theta, c.y, c.r));
+    this.obj.scale.setScalar(c.scale);
     this.obj.rotation.set(0, -c.theta - c.turn - c.flip, 0);
 
     // CSS backface culling is not dependable through these transforms: show

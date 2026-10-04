@@ -51,7 +51,7 @@
     background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.25) 50%, transparent 62%, rgba(0,0,0,.25) 62%, transparent 74%); }
   .face.back textarea { flex: 1; border: 0; padding: 14px; resize: none; background: #e7eae2; color: #2a3036;
     font: 14px/1.5 "Marker Felt", "Segoe Print", "Comic Sans MS", cursive; }
-  .win .shield { position: absolute; inset: 0; display: none; cursor: pointer; }
+  .win .shield { position: absolute; inset: 0; display: none; cursor: pointer; transform: translateZ(calc(var(--half) + 1px)); }
   .win.parked .shield, .win.overview .shield { display: block; }
 
   /* built-in apps */
