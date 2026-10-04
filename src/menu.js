@@ -31,6 +31,9 @@ export function closeMenus() {
 
 export const menuOpen = () => !!open;
 
+/** The open menu's element, if any. */
+export const openMenu = () => open?.el || null;
+
 /**
  * Show items in host at (x, y) in host pixels. { up: true } puts the menu's
  * bottom at y instead of its top.

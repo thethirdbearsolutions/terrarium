@@ -1,18 +1,23 @@
 // A window is a slab: a front face, a back face you can write on, and four
-// edges. It stands on the ring at angle theta, height y, and depth (how far
-// past the ring it has been pushed). Everything eases toward its target.
-// Minimized, it is an icon in a row along the bottom of the view.
+// edges. It stands on the floor at (x, z), its middle at height y, turned to
+// yaw (0 faces +z). Everything eases toward its target. Minimized, it is an
+// icon in a row along the bottom of the view, riding along with the eye.
 
+import { Vector3, Quaternion } from 'three';
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { GLYPH } from './icons.js';
-import { popup, closeMenus, menuBar, offsetIn } from './menu.js';
+import { popup, closeMenus, menuBar, offsetIn, openMenu } from './menu.js';
+import { MAP_GROW, MAP_TILT } from './space.js';
+
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const UP = new Vector3(0, 1, 0);
 
 export const THICK = 14;
 export const FRAME = 5;    // the sizing border, outline to outline
 export const BAR = 20;     // the title bar
 export const CHROME = { w: FRAME * 2, h: FRAME * 2 + BAR };
 export const ICON = { w: 76, h: 58 };   // one minimized window's slot
-const ICON_NEAR = 0.4;     // the icons' distance, as a fraction of the ring's
+const ICON_NEAR = 0.05;    // the icons' distance, as a fraction of D: nearer than you can get to a window
 const MAX_NEAR = 0.6;      // a maximized window's
 const CORNER = 20;         // how far along an edge the corner's sizing reaches
 
@@ -41,11 +46,12 @@ export class Win {
     const n = parseInt(this.id.slice(1), 10);
     if (n >= nextId) nextId = n + 1;
     this.w = s.w ?? app.w; this.h = s.h ?? app.h;
-    this.theta = s.theta ?? 0; this.y = s.y ?? 0; this.depth = s.depth ?? 0;
-    this.turn = s.turn ?? 0; this.flipped = !!s.flipped;
+    this.x = s.x ?? 0; this.z = s.z ?? 0; this.yaw = s.yaw ?? 0; this.y = s.y ?? 0;
+    this.flipped = !!s.flipped;
     this.minimized = !!(s.minimized ?? s.parked);
     this.maximized = !!s.maximized;
     this.normal = s.normal || null;   // where Restore puts a maximized window back
+    this.hand = null;                 // where a hand (or the keys) is putting it, while held
     this.notes = s.notes ?? '';
     this.title = app.title;
     this.file = s.file || null;   // what it was opened with, if anything
@@ -82,7 +88,9 @@ export class Win {
       b.addEventListener('wheel', (e) => {
         e.preventDefault();
         if (this.maximized) return;
-        this.depth = Math.max(-200, Math.min(2400, this.depth + e.deltaY * 1.2)); this.resync = true; shell.saveLayout();
+        // push it away or pull it near, along the line of sight
+        const F = shell.space.player.forward, d = e.deltaY * 1.2;
+        this.x += F.x * d; this.z += F.z * d; this.resync = true; shell.saveLayout();
       }, { passive: false });
       b.addEventListener('contextmenu', (e) => e.preventDefault());
       b.querySelectorAll('button').forEach(btn => {
@@ -112,6 +120,8 @@ export class Win {
     this.setTitle(app.title);
     this.size(this.w, this.h);
     this.obj = new CSS3DObject(el);
+    el.win = this;
+    this.occluder = shell.space.occluder();
     app.mount ? app.mount(this) : this.mountFrame();
   }
 
@@ -187,28 +197,29 @@ export class Win {
 
   /** Move or Size from the control menu: the arrow keys do it, Enter keeps it, Esc puts it back. */
   keyMode(mode) {
-    const s = this.shell, start = { theta: this.theta, y: this.y, w: this.w, h: this.h };
+    const s = this.shell, start = { x: this.x, z: this.z, y: this.y, w: this.w, h: this.h };
     const face = this.flipped ? this.back : this.front;
     face.querySelector('.sys').focus({ preventScroll: true });
-    this.dragging = true;
+    this.hold();
     this.el.classList.add(mode === 'move' ? 'moving' : 'sizing');
-    const D = s.space.D;
+    const R = s.space.player.right, A = this.across;
     const onKey = (e) => {
       const step = e.ctrlKey ? 1 : 8;
       const dx = { ArrowLeft: -step, ArrowRight: step }[e.key] || 0, dy = { ArrowUp: -step, ArrowDown: step }[e.key] || 0;
       if (dx || dy) {
-        if (mode === 'move') { this.theta += dx / (D + this.depth); this.y -= dy; }
+        if (mode === 'move') { this.hand.x += R.x * dx; this.hand.z += R.z * dx; this.hand.y -= dy; }
         else {
           const w0 = this.w, h0 = this.h;
           this.size(this.w + dx, this.h + dy);
-          this.theta += (this.w - w0) / 2 / (D + this.depth); this.y -= (this.h - h0) / 2;
+          this.hand.x += A.x * (this.w - w0) / 2; this.hand.z += A.z * (this.w - w0) / 2; this.hand.y -= (this.h - h0) / 2;
         }
+        this.y = this.hand.y;
       } else if (e.key === 'Enter' || e.key === 'Escape') {
-        if (e.key === 'Escape') { this.size(start.w, start.h); this.theta = start.theta; this.y = start.y; }
+        if (e.key === 'Escape') { this.size(start.w, start.h); Object.assign(this, { x: start.x, z: start.z, y: start.y }); this.resync = true; }
         removeEventListener('keydown', onKey, true);
         this.el.classList.remove('moving', 'sizing');
         // set down where the keys put it, not thrown
-        this.dragging = false; this.fling = null; this.resync = true;
+        this.letGo(false);
         this.resized();
         s.saveLayout();
       } else return;
@@ -217,8 +228,32 @@ export class Win {
     addEventListener('keydown', onKey, true);
   }
 
-  /** Screen pixels to ring units at this window's distance. */
-  get scale() { const D = this.shell.space.D; return (this.cur?.r ?? D + this.depth) / D; }
+  /** Take hold: from now the hand says where it goes. */
+  hold() {
+    this.dragging = true;
+    this.hand = { x: this.x, z: this.z, yaw: this.yaw, y: this.y };
+  }
+
+  /** Let go, thrown with the hand's speed or just set down. */
+  letGo(thrown = true) {
+    this.dragging = false;
+    this.hand = null;
+    if (!thrown) { this.fling = null; this.resync = true; }
+  }
+
+  /** Across the face, left to right as you look at the front. */
+  get across() { return { x: Math.cos(this.yaw), z: -Math.sin(this.yaw) }; }
+
+  /** Which way the front faces. */
+  get facing() { return { x: Math.sin(this.yaw), z: Math.cos(this.yaw) }; }
+
+  /** World px per screen px at this window, from where you stand. */
+  get scale() {
+    const sp = this.shell.space, p = sp.player, F = p.forward;
+    if (this.maximized || this.minimized) return this.cur?.scale ?? 1;
+    const ahead = (this.x - p.x) * F.x + (this.z - p.z) * F.z;
+    return Math.max(0.05, ahead / sp.D);
+  }
 
   barDown(e) {
     if (e.target.closest('button') || this.minimized) return;
@@ -226,25 +261,28 @@ export class Win {
     this.shell.focus(this);
     if (this.maximized) return;
     const turning = e.button === 2 || e.altKey;
-    this.dragging = true;
-    const sx = e.clientX, sy = e.clientY;
-    const start = { theta: this.theta, y: this.y, turn: this.turn };
-    const D = this.shell.space.D;
+    this.hold();
+    const sx = e.clientX, sy = e.clientY, k = this.scale;
+    const start = { ...this.hand };
+    const R = this.shell.space.player.right;
+    let moved = false;
     document.body.classList.add('dragging');
     const move = (ev) => {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if (turning) {
-        this.turn = start.turn + dx / 220;
-      } else {
-        const r = D + this.depth;
-        this.theta = start.theta + dx * this.scale / r;
-        this.y = start.y - dy * this.scale;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      if (turning) this.hand.yaw = start.yaw - dx / 220;
+      else {
+        // in the plane facing you
+        this.hand.x = start.x + R.x * dx * k; this.hand.z = start.z + R.z * dx * k;
+        this.hand.y = this.y = start.y - dy * k;
       }
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       document.body.classList.remove('dragging');
-      this.dragging = false;
+      this.letGo(moved);
+      // a click on the bar, not a drag: go and stand square in front of it
+      if (!moved && !turning) this.shell.bring(this);
       this.shell.saveLayout();
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
@@ -255,22 +293,23 @@ export class Win {
     if (this.maximized || this.minimized) return;
     e.preventDefault(); e.stopPropagation();
     this.shell.focus(this);
-    this.dragging = true;
+    this.hold();
     const ex = dir.includes('e') ? 1 : dir.includes('w') ? -1 : 0, ey = dir.includes('s') ? 1 : dir.includes('n') ? -1 : 0;
-    const sx = e.clientX, sy = e.clientY, w0 = this.w, h0 = this.h, th0 = this.theta, y0 = this.y;
-    const D = this.shell.space.D;
+    const sx = e.clientX, sy = e.clientY, w0 = this.w, h0 = this.h, start = { ...this.hand }, k = this.scale, A = this.across;
+    // seen from behind, the window's left is your right
+    const side = this.flipped ? -1 : 1;
     document.body.classList.add('dragging');
     const move = (ev) => {
-      const s = this.scale;
-      this.size(w0 + ex * (ev.clientX - sx) * s, h0 + ey * (ev.clientY - sy) * s);
+      this.size(w0 + ex * (ev.clientX - sx) * k, h0 + ey * (ev.clientY - sy) * k);
       // the opposite edge stays put
-      this.theta = th0 + ex * (this.w - w0) / 2 / (D + this.depth);
-      this.y = y0 - ey * (this.h - h0) / 2;
+      const m = side * ex * (this.w - w0) / 2;
+      this.hand.x = start.x + A.x * m; this.hand.z = start.z + A.z * m;
+      this.hand.y = this.y = start.y - ey * (this.h - h0) / 2;
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       document.body.classList.remove('dragging');
-      this.dragging = false;
+      this.letGo(false);
       this.resized();
       this.shell.saveLayout();
     };
@@ -281,62 +320,128 @@ export class Win {
     this.frame?.contentWindow?.postMessage({ terrarium: 1, type: 'resized', w: this.w - CHROME.w, h: this.h - CHROME.h }, '*');
   }
 
-  /** Where this window would stand if nothing were in its way. */
+  /**
+   * Where this window goes: { x, y, z, yaw, flip, scale }, or { local } for
+   * a place in the eye's own frame that rides along with it. punch: nothing
+   * in the maze covers it.
+   */
   target(iconIndex) {
     const sp = this.shell.space;
     if (this.minimized) {
-      // a row along the bottom-left of the view, in front of the ring so no
-      // window can cover it, facing the eye square and drawn at true size
+      // a row along the bottom-left of the view, nearer than anything else,
+      // facing the eye square and drawn at true size
       const per = Math.max(1, Math.floor((innerWidth - 16) / ICON.w));
       const col = iconIndex % per, row = Math.floor(iconIndex / per);
       const sx = -innerWidth / 2 + 8 + ICON.w / 2 + col * ICON.w;
       const sy = innerHeight / 2 - 6 - ICON.h / 2 - row * ICON.h;
-      const phi = Math.atan(sx / sp.D), r = sp.D * ICON_NEAR, along = r * Math.cos(phi);
-      return { theta: sp.pan + phi, y: -sy * along / sp.D, r, turn: -phi, flip: 0, scale: along / sp.D };
+      const along = sp.D * ICON_NEAR, k = along / sp.D;
+      return { local: { x: sx * k, y: -sy * k, z: -along }, flip: 0, scale: k, punch: true };
     }
     if (this.maximized) {
-      // nearer than any window in the ring can reach, and shrunk to match
-      return { theta: this.theta, y: this.y * MAX_NEAR, r: sp.D * MAX_NEAR, turn: 0, flip: this.flipped ? Math.PI : 0, scale: MAX_NEAR };
+      // nearer than anything else can reach, and shrunk to match
+      return { x: this.x, z: this.z, y: this.y * MAX_NEAR, yaw: this.yaw, flip: this.flipped ? Math.PI : 0, scale: MAX_NEAR };
     }
-    return { theta: this.theta, y: this.y, r: sp.D + this.depth, turn: this.turn, flip: this.flipped ? Math.PI : 0 };
+    return { x: this.x, z: this.z, y: this.y, yaw: this.yaw, flip: this.flipped ? Math.PI : 0 };
   }
 
   /** Ease toward t, where the shell has decided this window goes. */
   update(dt, target) {
-    const t = { scale: 1, ...target };
-    if (!this.cur) this.cur = { ...t, r: t.r + 900, flip: t.flip };
-    // glide in from wherever it was (opening, minimized); once there, the
-    // world moves it, so follow exactly or the eye sees it lag its collisions
+    const t = { scale: 1, ...target }, sp = this.shell.space, cam = sp.camera;
     const k = 1 - Math.exp(-dt * 10);
-    const far = Math.abs(t.theta - this.cur.theta) > 0.02 || Math.abs(t.r - this.cur.r) > 20 || Math.abs(t.y - this.cur.y) > 20;
-    if (far || this.minimized) this.gliding = true;
-    else this.gliding = false;
-    for (const key of ['theta', 'y', 'r', 'turn']) this.cur[key] += (t[key] - this.cur[key]) * (this.gliding ? k : 1);
-    for (const key of ['flip', 'scale']) this.cur[key] += (t[key] - this.cur[key]) * k;
-    const c = this.cur, sp = this.shell.space;
+    if (!this.cur) {
+      // come in from further off
+      const p = t.local ? cam.localToWorld(new Vector3(t.local.x, t.local.y, t.local.z * 3)) : null;
+      const at = p ? { x: p.x, y: p.y, z: p.z, yaw: sp.cam.yaw } : { x: t.x, y: t.y, z: t.z, yaw: t.yaw };
+      const dx = at.x - sp.cam.x, dz = at.z - sp.cam.z, d = Math.hypot(dx, dz) || 1;
+      this.cur = { ...at, x: at.x + dx / d * 900, z: at.z + dz / d * 900, flip: t.flip, scale: t.scale };
+    }
+    const c = this.cur;
+    if (t.local) {
+      // riding with the eye: ease in the eye's own frame
+      if (!c.local) { c.local = cam.worldToLocal(new Vector3(c.x, c.y, c.z)); c.turn = wrap(c.yaw - sp.cam.yaw); }
+      c.local.x += (t.local.x - c.local.x) * k; c.local.y += (t.local.y - c.local.y) * k; c.local.z += (t.local.z - c.local.z) * k;
+      c.turn += (0 - c.turn) * k;
+      const p = cam.localToWorld(c.local.clone());
+      c.x = p.x; c.y = p.y; c.z = p.z; c.yaw = sp.cam.yaw + c.turn;
+      this.gliding = true;
+    } else {
+      c.local = null;
+      // glide in from wherever it was (opening, minimized); once there, the
+      // world moves it, so follow exactly or the eye sees it lag its collisions
+      const far = Math.hypot(t.x - c.x, t.z - c.z) > 20 || Math.abs(t.y - c.y) > 20 || Math.abs(wrap(t.yaw - c.yaw)) > 0.02;
+      this.gliding = far;
+      const g = far ? k : 1;
+      c.x += (t.x - c.x) * g; c.z += (t.z - c.z) * g; c.y += (t.y - c.y) * g;
+      c.yaw += wrap(t.yaw - c.yaw) * g;
+    }
+    for (const key of ['flip', 'scale']) c[key] += (t[key] - c[key]) * k;
+
     this.el.classList.toggle('minimized', this.minimized);
     this.el.classList.toggle('maximized', this.maximized && !this.minimized);
     this.el.classList.toggle('overview', sp.overTarget > 0);
-    this.obj.position.copy(sp.ringPos(c.theta, c.y, c.r));
+    let yaw = c.yaw + c.flip;
+    this.obj.position.set(c.x, c.y, c.z);
     this.obj.scale.setScalar(c.scale);
-    this.obj.rotation.set(0, -c.theta - c.turn - c.flip, 0);
+    if (c.local) this.obj.quaternion.copy(cam.quaternion).multiply(new Quaternion().setFromAxisAngle(UP, c.turn + c.flip));
+    else if (sp.mapness > 0 && !this.maximized) {
+      // on the map every window turns up to face you, bigger, so you can see them all and pick one
+      const m = sp.mapness, grow = 1 + (MAP_GROW - 1) * m;
+      yaw = wrap(yaw - wrap(c.yaw) * m);
+      this.obj.scale.setScalar(c.scale * grow);
+      this.obj.position.y = c.y + m * (this.h * (grow - 1) / 2 + 120);
+      this.obj.rotation.set(MAP_TILT * m, yaw, 0, 'YXZ');
+    } else this.obj.rotation.set(0, yaw, 0, 'YXZ');
 
     // CSS backface culling is not dependable through these transforms: show
     // the face that points at the camera and hide the other
-    const yaw = -c.theta - c.turn - c.flip;
-    const nx = -Math.sin(-yaw), nz = Math.cos(yaw);
-    const cam = sp.camera.position, p = this.obj.position;
-    const facing = nx * (cam.x - p.x) + nz * (cam.z - p.z) > 0;
+    const eye = cam.position;
+    const facing = Math.sin(yaw) * (eye.x - c.x) + Math.cos(yaw) * (eye.z - c.z) > 0;
     this.front.style.visibility = facing ? '' : 'hidden';
     this.back.style.visibility = facing ? 'hidden' : '';
 
-    // a window behind the camera has no business being drawn
-    const ahead = Math.cos(c.theta - sp.pan);
-    this.el.style.display = sp.over < 0.05 && ahead < 0.05 ? 'none' : '';
+    // a window wholly behind the eye has no business being drawn, nor one wholly behind a wall
+    const shown = this.minimized || this.inView(sp);
+    // hidden, not taken out of the layout: an app loading in a frame that isn't laid out thinks it has no size
+    this.el.classList.toggle('unseen', !shown);
+
+    // its occluder, the same size and in the same place
+    const o = this.occluder;
+    o.visible = shown;
+    o.position.copy(this.obj.position);
+    o.quaternion.copy(this.obj.quaternion);
+    o.scale.copy(this.obj.scale);
+    const w = this.minimized ? ICON.w : this.w, h = this.minimized ? ICON.h : this.h;
+    o.slab.scale.set(w, h, this.minimized ? 1 : THICK);
+    sp.punch(o, !!t.punch);
+    this.menuOccluder();
+  }
+
+  /** Is any of it in front of the eye and not behind a wall? */
+  inView(sp) {
+    const c = this.cur, A = { x: Math.cos(c.yaw), z: -Math.sin(c.yaw) }, hw = this.w / 2 * c.scale;
+    const ends = [-1, -0.5, 0, 0.5, 1].map(f => ({ x: c.x + A.x * hw * f, z: c.z + A.z * hw * f }));
+    const ahead = ends.map(p => sp.toView(p).ahead);
+    if (ahead.every(a => a < 1)) return false;
+    if (sp.over > 0.02 || this.dragging) return true;
+    // walls run floor to ceiling, so seen from the eye only x and z matter
+    const e = sp.cam;
+    return ends.some(p => sp.wallDistance(e.x, e.z, p.x - e.x, p.z - e.z) >= 1);
+  }
+
+  /** An open menu that hangs past the window's edge still shows over the maze. */
+  menuOccluder() {
+    const m = this.occluder.menu, el = openMenu();
+    if (!el || el.closest('.win') !== this.el) { m.visible = false; return; }
+    const at = offsetIn(el, this.el), w = this.minimized ? ICON.w : this.w, h = this.minimized ? ICON.h : this.h;
+    const ow = el.offsetWidth + 4, oh = el.offsetHeight + 4;
+    const front = this.flipped ? -1 : 1;
+    m.visible = true;
+    m.position.set((at.x + ow / 2 - w / 2) * front, h / 2 - (at.y + oh / 2), THICK);
+    m.scale.set(ow, oh, 1);
   }
 
   state() {
-    const { id, w, h, theta, y, depth, turn, flipped, minimized, maximized, normal, notes, file } = this;
-    return { id, app: this.app.id, w, h, theta, y, depth, turn, flipped, minimized, maximized, normal, notes, file: file && { path: file.path, name: file.name } };
+    const { id, w, h, x, z, yaw, y, flipped, minimized, maximized, normal, notes, file } = this;
+    return { id, app: this.app.id, w, h, x, z, yaw, y, flipped, minimized, maximized, normal, notes, file: file && { path: file.path, name: file.name } };
   }
 }

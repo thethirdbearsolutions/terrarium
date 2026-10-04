@@ -19,7 +19,9 @@
     font: 11px/1.2 var(--ui); -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed; }
   button, input, textarea { font: inherit; color: inherit; -webkit-font-smoothing: none; }
   #gl, #css { position: fixed; inset: 0; }
-  #gl canvas { display: block; }
+  /* the maze is drawn over the windows, and lets the pointer through to them */
+  #gl { z-index: 1; pointer-events: none; }
+  #gl canvas { display: block; pointer-events: none; }
   body.dragging iframe, body.panning iframe { pointer-events: none; }
   u { text-decoration: underline; text-underline-offset: 1px; }
 
@@ -66,8 +68,10 @@
   .face.back textarea.nowrap { white-space: pre; overflow-wrap: normal; overflow-x: scroll; }
   .face.back textarea::selection { background: var(--navy); color: #fff; }
 
+  .win.unseen { visibility: hidden; }
   .win .shield { position: absolute; inset: 0; display: none; cursor: pointer; transform: translateZ(calc(var(--half) + 1px)); }
   .win.overview .shield { display: block; }
+  .win.overview .face { pointer-events: none; }
 
   /* minimized: an icon and its title */
   .win.minimized { width: 76px !important; height: 58px !important; }
@@ -222,7 +226,7 @@
 
   .control .client { flex: 1; }
 
-  #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; border: 3px dashed #fff; color: #fff; font-weight: bold; pointer-events: none; }
+  #drop { position: fixed; inset: 0; z-index: 2; display: none; align-items: center; justify-content: center; border: 3px dashed #fff; color: #fff; font-weight: bold; pointer-events: none; }
   body.dropping #drop { display: flex; }
 </style>
 </head>

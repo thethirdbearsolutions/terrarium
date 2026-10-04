@@ -1,5 +1,6 @@
-// The desktop: a color and an 8×8 pattern, the same on the sky and the floor.
-// Chosen in Control Panel, kept in localStorage.
+// The desktop: a color and an 8×8 pattern on the floor, the color again in a
+// darker shade on the ceiling, and what the walls are made of. Chosen in
+// Control Panel, kept in localStorage.
 
 const KEY = 'terrarium.desktop';
 
@@ -20,7 +21,9 @@ export const PATTERNS = [
   { name: 'Drizzle', rows: ['10000000', '10000000', '00000000', '00001000', '00001000', '00000000', '00100000', '00000000'] },
 ];
 
-export const DEFAULT = { color: '#008080', pattern: 'Sprouts' };
+export const WALLS = ['Panels'];
+
+export const DEFAULT = { color: '#008080', pattern: 'Sprouts', walls: 'Panels' };
 
 export function load() {
   try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return { ...DEFAULT }; }
@@ -32,6 +35,14 @@ export function save(d) {
 
 export const inkFor = (color) => COLORS.find(c => c.color === color)?.ink || '#000000';
 export const patternNamed = (name) => PATTERNS.find(p => p.name === name) || PATTERNS[0];
+export const wallsNamed = (name) => (WALLS.includes(name) ? name : WALLS[0]);
+
+/** The ceiling: the desktop color, darker (and black lifted to a dark gray, so it reads). */
+export function ceilingFor(color) {
+  const n = parseInt(color.slice(1), 16), k = 0.55;
+  const ch = (v) => Math.round(Math.max(v * k, 0x20)).toString(16).padStart(2, '0');
+  return '#' + ch(n >> 16) + ch((n >> 8) & 255) + ch(n & 255);
+}
 
 /** The pattern drawn into a canvas, scale px per bit. */
 export function tile({ color, pattern }, scale = 1) {

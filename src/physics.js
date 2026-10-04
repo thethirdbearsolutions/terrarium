@@ -1,8 +1,9 @@
 // Windows are rigid slabs sliding on the floor. Seen from above each is a
 // line segment with a little thickness, a mass, a velocity, and a spin about
 // the vertical. They knock each other with impulses at the point of contact,
-// bounce, and slide to a stop. The room is a ring: a glass wall near the eye,
-// a far wall beyond. Units are CSS pixels and seconds.
+// bounce, and slide to a stop. Walls are fixed boxes: windows bounce off
+// them, and anything moved by a hand or a walker is simply stopped. Units are
+// CSS pixels and seconds.
 
 export const TUNING = {
   restitution: 0.45,     // bounce between windows
@@ -24,6 +25,7 @@ export class Body {
     Object.assign(this, { x, z, yaw, y, hw, hh, ht });
     this.vx = 0; this.vz = 0; this.w = 0;
     this.kinematic = false;   // moved by a hand, not by the world
+    this.fixed = false;       // a wall: never moves at all
   }
   get mass() { return (this.hw * this.hh) / 2500; }
   get inertia() { return this.mass * (4 * this.hw * this.hw) / 12; }
@@ -76,7 +78,14 @@ function touchPoint(a, b) {
   const r = { x: p1.x - p2.x, z: p1.z - p2.z };
   const A = dot(d1, d1), E = dot(d2, d2), F = dot(d2, r), C = dot(d1, r), B = dot(d1, d2);
   const den = A * E - B * B;
-  let s = den > 1e-9 ? clamp((B * F - C * E) / den, 0, 1) : 0;
+  if (den <= 1e-3 * A * E) {
+    // side by side: the middle of where they overlap, so a flat hit doesn't spin
+    const s0 = clamp(-C / A, 0, 1), s1 = clamp((B - C) / A, 0, 1), s = (s0 + s1) / 2;
+    const c1 = { x: p1.x + d1.x * s, z: p1.z + d1.z * s };
+    const t = clamp(dot(d2, { x: c1.x - p2.x, z: c1.z - p2.z }) / E, 0, 1), c2 = { x: p2.x + d2.x * t, z: p2.z + d2.z * t };
+    return { x: (c1.x + c2.x) / 2, z: (c1.z + c2.z) / 2 };
+  }
+  let s = clamp((B * F - C * E) / den, 0, 1);
   let t = (B * s + F) / E;
   if (t < 0) { t = 0; s = clamp(-C / A, 0, 1); } else if (t > 1) { t = 1; s = clamp((B - C) / A, 0, 1); }
   const c1 = { x: p1.x + d1.x * s, z: p1.z + d1.z * s }, c2 = { x: p2.x + d2.x * t, z: p2.z + d2.z * t };
@@ -112,12 +121,12 @@ function collide(a, b, n, p, depth, e, T) {
   if (b) { b.x += n.x * push * b.invMass; b.z += n.z * push * b.invMass; }
 }
 
-/** Advance the world by dt. room: { near, far } radii of the walls around the origin. */
-export function step(bodies, dt, room = null, T = TUNING) {
+/** Advance the world by dt. walls are fixed bodies. */
+export function step(bodies, dt, walls = [], T = TUNING) {
   const h = dt / T.substeps;
   for (let s = 0; s < T.substeps; s++) {
     for (const b of bodies) {
-      // a hand-held window moves too, in the same small steps, so a fast
+      // a hand-held window or a walker moves too, in the same small steps, so a fast
       // swing can't jump clean through something thinner than one frame's travel
       b.x += b.vx * h; b.z += b.vz * h; b.yaw += b.w * h;
       if (b.kinematic) continue;
@@ -137,15 +146,18 @@ export function step(bodies, dt, room = null, T = TUNING) {
         if (c) collide(a, b, c.n, c.p, c.depth, T.restitution, T);
       }
     }
-    if (room) for (const b of bodies) {
-      if (b.kinematic) continue;
-      for (const p of b.ends()) {
-        const r = Math.hypot(p.x, p.z);
-        if (r < 1e-6) continue;
-        const out = { x: p.x / r, z: p.z / r };
-        // the wall pushes along n toward the inside of the room; collide() takes n as pointing from b to the wall
-        if (r < room.near) collide(b, null, { x: -out.x, z: -out.z }, p, room.near - r, T.wallRestitution, T);
-        else if (r > room.far) collide(b, null, out, p, r - room.far, T.wallRestitution, T);
+    for (const b of bodies) {
+      const reach = b.hw + b.ht;
+      for (const w of walls) {
+        if (Math.abs(w.x - b.x) > w.hw + w.ht + reach || Math.abs(w.z - b.z) > w.hw + w.ht + reach) continue;
+        const c = contact(b, w);
+        if (!c) continue;
+        if (b.kinematic) {
+          // stopped: put back outside, and lose the part of the motion that went in
+          b.x -= c.n.x * c.depth; b.z -= c.n.z * c.depth;
+          const vn = b.vx * c.n.x + b.vz * c.n.z;
+          if (vn > 0) { b.vx -= c.n.x * vn; b.vz -= c.n.z * vn; }
+        } else collide(b, null, c.n, c.p, c.depth, T.wallRestitution, T);
       }
     }
   }

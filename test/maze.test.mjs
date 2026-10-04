@@ -82,3 +82,17 @@ test('a window inside a wall is moved to the nearest open floor', () => {
   assert.ok(clearOf(m, walls, new Body({ ...win, x: p.x, z: p.z, hw: 400, ht: 7 })));
   assert.ok(Math.hypot(p.x - win.x, p.z - win.z) < 600, 'and not far');
 });
+
+test('a window thrown end-on at a wall running along z bounces straight back', async () => {
+  const { step } = await import('../src/physics.js');
+  const [wall] = wallBodies([{ x: 1000, z: 0, hw: 60, hd: 1600 }]);
+  const b = new Body({ x: 0, z: 0, yaw: 0, hw: 200, ht: 7 }); b.vx = 2000;
+  let back = false;
+  for (let t = 0; t < 2; t += 1 / 60) {
+    step([b], 1 / 60, [wall]);
+    assert.ok(b.x + 200 < 940 + 6, `into the wall: right end at ${b.x + 200}`);
+    if (b.vx < 0) back = true;
+  }
+  assert.ok(back, 'it came back');
+  assert.ok(Math.abs(b.w) < 0.2, `without much spin: ${b.w}`);
+});

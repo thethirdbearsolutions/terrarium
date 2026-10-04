@@ -167,10 +167,15 @@ export function wallBoxes(m) {
   return boxes;
 }
 
-/** The walls as fixed bodies for the physics: tall enough that nothing passes over. */
+/**
+ * The walls as fixed bodies for the physics: tall enough that nothing passes
+ * over, and turned so the body's long axis runs along the wall, which is
+ * where the physics looks for the point of contact.
+ */
 export function wallBodies(boxes) {
   return boxes.map(b => {
-    const body = new Body({ x: b.x, z: b.z, yaw: 0, hw: b.hw, ht: b.hd, hh: 1e6, y: 0 });
+    const along = b.hw >= b.hd;
+    const body = new Body({ x: b.x, z: b.z, yaw: along ? 0 : Math.PI / 2, hw: along ? b.hw : b.hd, ht: along ? b.hd : b.hw, hh: 1e6, y: 0 });
     body.kinematic = true;
     body.fixed = true;
     return body;
@@ -227,7 +232,7 @@ export function clearOf(m, walls, body, margin = 0) {
   if (body.x < bd.x0 || body.x > bd.x1 || body.z < bd.z0 || body.z > bd.z1) return false;
   const reach = probe.hw + probe.ht;
   for (const w of walls) {
-    if (Math.abs(w.x - body.x) > w.hw + reach || Math.abs(w.z - body.z) > w.ht + reach) continue;
+    if (Math.abs(w.x - body.x) > w.hw + w.ht + reach || Math.abs(w.z - body.z) > w.hw + w.ht + reach) continue;
     if (contact(probe, w)) return false;
   }
   return true;
