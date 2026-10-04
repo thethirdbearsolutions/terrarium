@@ -1,7 +1,9 @@
 # Terrarium
 
-A desktop in a room. The windows stand in a ring around you; turn to see the
-rest of them, step back to see them all.
+A desktop in a maze. The windows stand on the floor of its corridors and
+rooms; walk up to one to use it, step back to see them all from above.
+
+![A corridor with windows](shots/maze-corridor.png)
 
 ## Running it
 
@@ -13,38 +15,73 @@ serves this repo and its siblings (`hardreturn`, `bingleball`, `magnimarbles`,
 `turtlebloom`, `webturtles`) from one origin at http://localhost:8077/, and
 the shell frames the local copies. Deployed, it frames the deployed apps.
 
+## Controls
+
+The walking keys are the shell's while no app has the keyboard. Click the
+floor or a wall to take it back from an app, or press Esc in a built-in
+one (Program Manager, File Manager, Control Panel, Clock).
+
+| | |
+|---|---|
+| ↑ / W, ↓ / S | walk forward, back |
+| ← → | turn |
+| A D, Alt+← Alt+→ | step sideways |
+| drag the floor | turn |
+| scroll on the floor | walk forward, back |
+| click a title bar | walk up to that window and stand square in front of it |
+| O, or Window ▸ Step Back | the map; click a window there to walk to it; O or Esc to come down |
+
+Walls stop you; windows you walk into get knocked out of the way. Any
+movement key stops a walk that's taking you somewhere.
+
 ## Using it
 
 - Program Manager starts things: double-click an icon in Main (or select it
-  and press Enter). An app you have open is brought to you rather than
-  started again; Shift opens another.
-- Drag the empty desktop, scroll, or press ← → to turn. Program Manager's
-  Window menu has Turn Left, Turn Right, and Step Back (or `o`), which shows
-  the whole room; click a window there to go to it.
-- Double-click the empty desktop, or press Ctrl+Esc, for the Task List:
-  Switch To, End Task, Cascade (stacked, each further back), Tile (side by
-  side along the ring) and Arrange Icons. Program Manager is always on it,
-  so a closed one can come back.
-- Drag a window by its title bar; double-click the bar to maximize. Drag
-  any edge or corner of the border to size it. Scroll on the bar to push it
-  away or pull it near; right-drag (or Alt-drag) the bar to turn it.
-- ▼ minimizes a window to an icon along the bottom of the view; click the
-  icon for its control menu, double-click it to restore. ▲ maximizes to fill
-  the view; Restore puts it back.
+  and press Enter). A new window opens in front of you; one you already
+  have open, you walk to rather than starting it again. Shift opens
+  another. Program Manager's Window menu has Turn Left, Turn Right (a
+  quarter turn each) and Step Back.
+- Double-click the floor, or press Ctrl+Esc, for the Task List: Switch To
+  (walks you there), End Task, Cascade (stacked in front of you, each
+  further back), Tile (side by side around you) and Arrange Icons.
+  Program Manager is always on it, so a closed one can come back.
+- Drag a window by its title bar to move it across your view; double-click
+  the bar to maximize. Drag any edge or corner of the border to size it.
+  Scroll on the bar to push it away or pull it near; right-drag (or
+  Alt-drag) the bar to turn it.
+- ▼ minimizes a window to an icon along the bottom of the view, which goes
+  where you go; click the icon for its control menu, double-click it to
+  restore it in front of you. ▲ maximizes to fill the view; Restore puts it
+  back where it stood.
 - The box at the left of the title bar opens the control menu (Alt+Space
   when no app has the keyboard): Restore, Move and Size (with the arrow
   keys), Minimize, Maximize, Close (Ctrl+F4, or double-click the box),
   Switch To, and Turn Around, which shows the back of the window. You can
   write on the back; F5 puts in the time and date.
 - Windows are solid. One that would pass through another is pushed back or
-  aside instead, and a thrown one knocks the others about.
+  aside instead, and a thrown one knocks the others about and bounces off
+  the walls.
 - File Manager shows the files as drive c:, opens them with their app, and
-  imports, exports, renames and deletes. Files dropped onto the room land in
-  `c:\documents`.
-- Control Panel ▸ Desktop sets the desktop color and pattern.
+  imports, exports, renames and deletes. Files dropped onto the floor land
+  in `c:\documents`.
+- Control Panel ▸ Desktop sets the desktop color and the floor's pattern
+  (the ceiling is the color, darker) and the walls: Panels, Brick or Stone.
 
-The layout, the notes on the backs, the desktop, and the files persist in
-the browser.
+Where you stand, the layout, the notes on the backs, the desktop, and the
+files persist in the browser. A layout saved before the maze comes back
+with its ring standing in the starting room.
+
+## The maze
+
+`MAZE` in `src/maze.js` holds the seed, the size in cells, the cell and
+wall sizes, how many walls are knocked out for loops, the starting room
+and how many other rooms. The same seed gives the same maze on every
+visit. Walking speeds are `MOVE` in `src/player.js`; the map's angle, how
+far its walls sink and how much its windows grow are at the top of
+`src/space.js`.
+
+![Round a corner](shots/maze-corner.png)
+![The map](shots/maze-map.png)
 
 ## Apps
 
@@ -59,11 +96,15 @@ app that speaks it.
 
 ## Layout
 
-- `src/space.js` the room: camera, desktop color, patterned floor, turning, stepping back
-- `src/desktop.js` the desktop colors and patterns
-- `src/window.js` a window: frame, faces, edges, dragging, sizing, the control menu, its icon
-- `src/physics.js` windows as rigid bodies: impacts, spin, friction, the walls
-- `src/shell.js` focus, minimizing and maximizing, Cascade and Tile, opening files, the protocol, saving the layout
+- `src/space.js` the world: the camera, the maze in WebGL over the windows, occluders, floor, ceiling, the map
+- `src/maze.js` the level: generation from a seed, walls as boxes and bodies, paths, rays, clear floor
+- `src/player.js` you: walking, turning, and walking by yourself to somewhere
+- `src/walls.js` Panels, Brick and Stone, drawn on a canvas
+- `src/layout.js` saved layouts, and reading old ring ones into the maze
+- `src/desktop.js` the desktop colors, patterns and walls
+- `src/window.js` a window: frame, faces, edges, dragging, sizing, the control menu, its icon, its occluder
+- `src/physics.js` windows, you and the walls as rigid bodies: impacts, spin, friction
+- `src/shell.js` focus, walking to windows, minimizing and maximizing, Cascade and Tile, opening files, the protocol, saving the layout
 - `src/menu.js` drop-down menus and menu bars
 - `src/dialogs.js` message boxes, list boxes, combo boxes, the Task List
 - `src/progman.js` Program Manager
