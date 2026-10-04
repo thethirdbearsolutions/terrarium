@@ -76,9 +76,8 @@ with its ring standing in the starting room.
 `MAZE` in `src/maze.js` holds the seed, the size in cells, the cell and
 wall sizes, how many walls are knocked out for loops, the starting room
 and how many other rooms. The same seed gives the same maze on every
-visit. Walking speeds are `MOVE` in `src/player.js`; the map's angle, how
-and how far its walls sink are at the top of
-`src/space.js`.
+visit. Walking speeds are `MOVE` in `src/player.js`; the map's angle and
+how far its walls sink are at the top of `src/space.js`.
 
 ![Round a corner](shots/maze-corner.png)
 ![The map](shots/maze-map.png)
