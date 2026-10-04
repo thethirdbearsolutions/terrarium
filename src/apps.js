@@ -15,6 +15,12 @@ export const APPS = [
       <path d="M13 13h22M13 18h18M13 23h22M13 28h12" stroke="#c9cfdf" stroke-width="2.4"/><path d="M33 26v6h-7l2.5-2.5M26 32l2.5 2.5" stroke="#fff" stroke-width="2.2" fill="none"/>`),
   },
   {
+    id: 'hardreturn-win', title: 'Hard Return for Windows', w: 800, h: 628,
+    url: at('/hardreturn/win/', 'https://hardreturn.vercel.app/win/'), accepts: ['.hr', '.txt'],
+    icon: icon(`<rect x="4" y="6" width="40" height="36" fill="#c0c0c0" stroke="#000" stroke-width="1.5"/><rect x="5" y="7" width="38" height="6" fill="#000080"/>
+      <rect x="9" y="16" width="30" height="23" fill="#fff" stroke="#808080"/><path d="M13 21h22M13 25h18M13 29h22M13 33h12" stroke="#000080" stroke-width="2"/>`),
+  },
+  {
     id: 'files', title: 'Files', w: 600, h: 400, builtin: 'files',
     icon: icon(`<path d="M5 13a3 3 0 0 1 3-3h11l4 4h17a3 3 0 0 1 3 3v19a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" fill="#e3b552"/><path d="M5 19h38v17a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" fill="#f2cf74"/>`),
   },

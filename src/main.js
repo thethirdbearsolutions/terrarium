@@ -4,7 +4,7 @@ import * as fs from './fs.js';
 
 const space = new Space(document.getElementById('gl'), document.getElementById('css'));
 const shell = new Shell(space);
-window.__terrarium = { space, shell, fs };
+window.__terrarium = { space, shell, fs, APPS };
 
 // ---- dock ------------------------------------------------------------------
 
