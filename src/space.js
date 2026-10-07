@@ -331,10 +331,10 @@ export class Space {
     this.mapness = e;
     if (e > 0 && !this.map) this.map = this.mapPose();
     if (e === 0) this.map = null;
-    const m = this.map || { x: p.x, y: 0, z: p.z, yaw: p.yaw, pitch: 0 };
+    const m = this.map || { x: p.x, y: 0, z: p.z, yaw: p.yaw, pitch: p.pitch };
     const yaw = p.yaw + wrap(m.yaw - p.yaw) * e;
     this.camera.position.set(p.x + (m.x - p.x) * e, m.y * e, p.z + (m.z - p.z) * e);
-    this.camera.rotation.set(m.pitch * e, yaw, 0);
+    this.camera.rotation.set(p.pitch + (m.pitch - p.pitch) * e, yaw, 0);
     this.cam = { x: this.camera.position.x, z: this.camera.position.z, yaw };
     this.sky.position.copy(this.camera.position);
     this.camera.updateMatrixWorld();

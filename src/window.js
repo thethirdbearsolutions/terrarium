@@ -6,6 +6,7 @@
 import { Vector3, Quaternion } from 'three';
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { GLYPH } from './icons.js';
+import { FLOOR_Y, CEIL_Y } from './space.js';
 import { popup, closeMenus, menuBar, offsetIn, openMenu } from './menu.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -93,7 +94,7 @@ export class Win {
         e.preventDefault();
         if (this.maximized) return;
         // raise it or lower it
-        this.y = Math.max(-480, Math.min(560, this.y - e.deltaY * 0.6));
+        this.y = Math.max(FLOOR_Y + this.h / 2 + 2, Math.min(CEIL_Y - this.h / 2 - 2, this.y - e.deltaY * 0.6));
         if (this.hand) this.hand.y = this.y;
         shell.saveLayout();
       }, { passive: false });

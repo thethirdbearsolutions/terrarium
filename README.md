@@ -26,7 +26,7 @@ one (Program Manager, File Manager, Control Panel, Clock).
 | ↑ / W, ↓ / S | walk forward, back |
 | ← → | turn |
 | A D, Shift+← Shift+→ (or Alt) | step sideways |
-| drag the floor | turn |
+| drag the floor | turn, and look up or down |
 | scroll on the floor | walk forward, back |
 | click a title bar | walk up to that window and stand square in front of it |
 | O, or Window ▸ Step Back | the map, with every window where it really stands and a mark on the floor for the way it faces; click a window or its mark to walk to it; O or Esc to come down |
@@ -73,6 +73,20 @@ movement key stops a walk that's taking you somewhere.
 Where you stand, the layout, the notes on the backs, the desktop, and the
 files persist in the browser. A layout saved before the maze comes back
 with its ring standing in the starting room.
+
+## The marble
+
+A Magnimarbles marble rolls on the floor of the maze. Click the floor to
+put a magnet down (Shift-click for a blue one), click a magnet to flip it,
+drag it to move it, Alt-click or right-click it to pick it up. Red pushes
+the marble, blue pulls it; six can be down at once, and a seventh takes up
+the oldest. The walls stop it, you kick it by walking into it, and a window
+lowered far enough to meet it (scroll on its bar) is a wall too, and a
+paddle while it moves. Drag the floor down to look down at it.
+
+The marble's physics is Magnimarbles' own `src/physics.js`, imported from
+a pinned commit through the import map in `index.html`; move the pin to
+take a newer one.
 
 ## The maze
 

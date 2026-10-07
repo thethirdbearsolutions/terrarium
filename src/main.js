@@ -3,10 +3,14 @@ import { Shell, APPS } from './shell.js';
 import { closeMenus, menuOpen } from './menu.js';
 import * as fs from './fs.js';
 import * as maze from './maze.js';
+import { Marbles } from './marbles.js';
+import { FLOOR_Y } from './space.js';
+import { MOVE } from './player.js';
 
 const space = new Space(document.getElementById('gl'), document.getElementById('css'));
 const shell = new Shell(space);
-window.__terrarium = { space, shell, fs, APPS, maze };
+const marbles = new Marbles(space, shell, FLOOR_Y);
+window.__terrarium = { space, shell, fs, APPS, maze, marbles };
 
 // ---- the empty world: the floor, the walls, the sky -----------------------------
 
@@ -29,16 +33,18 @@ function hiddenBehindWall(e) {
 
 function grabWorld(e) {
   const ev0 = e;
-  const sx = e.clientX, yaw0 = space.player.yaw;
+  const sx = e.clientX, sy = e.clientY, yaw0 = space.player.yaw, pitch0 = space.player.pitch;
   let moved = false;
   document.body.classList.add('panning');
   // the keys belong to the shell again
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   const move = (ev) => {
-    const dx = ev.clientX - sx;
-    if (Math.abs(dx) > 3) moved = true;
-    space.player.glide = null;
-    space.player.yaw = yaw0 + dx / space.D * (1 + space.over * 1.5);
+    const dx = ev.clientX - sx, dy = ev.clientY - sy, p = space.player;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    p.glide = null;
+    p.yaw = yaw0 + dx / space.D * (1 + space.over * 1.5);
+    // up and down look up and down, as if the floor were pulled; not on the map
+    if (!space.overTarget) p.pitch = Math.max(-MOVE.lookDown, Math.min(MOVE.lookUp, pitch0 + dy / space.D));
   };
   const up = () => {
     removeEventListener('pointermove', move); removeEventListener('pointerup', up);
@@ -47,6 +53,13 @@ function grabWorld(e) {
       // on the map, a click near a window's footprint goes to it
       const pt = space.pickFloor(ev0.clientX, ev0.clientY), w = pt && shell.windowAt(pt);
       if (w) shell.shieldClick(w); else shell.setOverview(false);
+    } else if (!moved) {
+      // a click on the floor puts a magnet there, unless it was the first of a double-click
+      const pt = floorAt(ev0.clientX, ev0.clientY);
+      if (pt) {
+        clearTimeout(placing);
+        placing = setTimeout(() => marbles.place(pt, ev0.shiftKey ? -1 : 1), 260);
+      }
     }
     shell.saveLayout();
   };
@@ -62,12 +75,51 @@ addEventListener('pointerdown', (e) => {
 }, true);
 
 addEventListener('pointerdown', (e) => {
-  if (!isBackground(e.target) || e.button !== 0) return;
-  grabWorld(e);
+  if (!isBackground(e.target) || (e.button !== 0 && e.button !== 2)) return;
+  if (!space.overTarget && grabMagnet(e)) return;
+  if (e.button === 0) grabWorld(e);
 });
+addEventListener('contextmenu', (e) => { if (isBackground(e.target)) e.preventDefault(); });
 
 // double-click the desktop for the Task List
-addEventListener('dblclick', (e) => { if (isBackground(e.target) && !space.overTarget) shell.taskList(); });
+addEventListener('dblclick', (e) => { if (isBackground(e.target) && !space.overTarget) { clearTimeout(placing); shell.taskList(); } });
+
+// ---- magnets on the floor --------------------------------------------------------
+
+const MAGNET_REACH = 9000;   // px: further off than this a click on the floor is for turning, not for magnets
+let placing = null;
+
+/** The floor you can see under the pointer, near enough to reach: not the floor past a wall. */
+function floorAt(cx, cy) {
+  const pt = space.pickFloor(cx, cy), eye = space.camera.position;
+  if (!pt) return null;
+  const d = Math.hypot(pt.x - eye.x, pt.z - eye.z);
+  if (d > MAGNET_REACH) return null;
+  return space.wallDistance(eye.x, eye.z, (pt.x - eye.x) / d, (pt.z - eye.z) / d) < d ? null : pt;
+}
+
+/** A magnet under the pointer: click flips it, drag moves it, Alt- or right-click picks it up. */
+function grabMagnet(e) {
+  const pt = floorAt(e.clientX, e.clientY), m = pt && marbles.magnetAt(pt);
+  if (!m) return false;
+  e.preventDefault();
+  if (e.altKey || e.button === 2) { marbles.remove(m); return true; }
+  const sx = e.clientX, sy = e.clientY;
+  let moved = false;
+  document.body.classList.add('dragging');
+  const move = (ev) => {
+    if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
+    const q = space.pickFloor(ev.clientX, ev.clientY);
+    if (moved && q) marbles.moveTo(m, q);
+  };
+  const up = () => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    document.body.classList.remove('dragging');
+    if (!moved) marbles.flip(m); else marbles.save();
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+  return true;
+}
 
 // the wheel walks
 addEventListener('wheel', (e) => {
@@ -126,6 +178,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   shell.update(dt);
+  marbles.update(dt);
   space.render();
   requestAnimationFrame(frame);
 }

@@ -15,6 +15,7 @@ export const MOVE = {
   turn: 2.2,         // rad/s
   accel: 7,          // how fast speed reaches what the keys ask, per second
   turnAccel: 11,
+  lookUp: 0.35, lookDown: 0.8,   // rad, as far as the eyes go
   glide: 1700,       // px/s, walking by itself
   glideTurn: 3.4,    // rad/s
   size: 60,          // the box, px across
@@ -35,6 +36,7 @@ export class Player {
     this.body = new Body({ x, z, yaw: 0, hw: half, ht: half, hh: MOVE.eyeOverFloor / 2 + 25, y: -MOVE.eyeOverFloor / 2 + 25 });
     this.body.kinematic = true;
     this.yaw = yaw;
+    this.pitch = 0;                       // looking up (+) or down (-)
     this.f = 0; this.s = 0; this.t = 0;   // forward, rightward and turning speeds
     this.held = new Map();                // key code -> action
     this.side = false;                    // Shift or Alt: turning keys step sideways
@@ -128,13 +130,14 @@ export class Player {
     // facing: where it's going, and the goal's way on the last stretch
     const heading = Math.atan2(-dx, -dz);
     const wantYaw = last && d < 1600 ? goal.yaw : d > 1 ? heading : goal.yaw;
+    this.pitch *= Math.exp(-dt * 6);       // eyes level again, to see the window square
     const dy = wrap(wantYaw - this.yaw), turn = Math.sign(dy) * Math.min(Math.abs(dy), Math.max(Math.abs(dy) * 7, 0.15) * dt, MOVE.glideTurn * dt);
     this.yaw = wrap(this.yaw + turn);
     this.f = this.s = this.t = 0;
 
     if (last && d < 0.5 && Math.abs(wrap(goal.yaw - this.yaw)) < 0.0015) {
       // there: exactly there
-      b.x = goal.x; b.z = goal.z; b.vx = b.vz = 0; this.yaw = goal.yaw;
+      b.x = goal.x; b.z = goal.z; b.vx = b.vz = 0; this.yaw = goal.yaw; this.pitch = 0;
       this.glide = null;
       g.onArrive?.();
     }

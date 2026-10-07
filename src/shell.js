@@ -192,6 +192,7 @@ export class Shell {
   /** In front of you, as big as the view. */
   fitMax(w) {
     const sp = this.space;
+    sp.player.pitch = 0;   // square in front of level eyes
     Object.assign(w, sp.inFront(0, (sp.D + THICK / 2) * MAX_NEAR, 0));   // the front face, not the middle, at true size
     w.size(innerWidth - MAX_MARGIN * 2, innerHeight - MAX_MARGIN * 2);
     w.resync = true;
