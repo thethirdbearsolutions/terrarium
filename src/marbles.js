@@ -17,7 +17,15 @@ export const MARBLES = {
   unit: 150,          // CSS px per Magnimarbles unit: the marble is 150px across
   magnets: 6,         // how many you can have down at once; one more takes up the oldest
   kick: 18,           // fastest a window or a walker moves the marble, in units/s
+  power: 5,           // magnets, as many times as strong as on a Magnimarbles board: the maze is a big floor
+  rolling: 0.02,      // rolling resistance, as Magnimarbles' MU_FLOOR (0.08 there)
 };
+
+/** Magnimarbles' world, with the magnets and the floor tuned for the maze. */
+class MazeWorld extends World {
+  magneticForce(px, pz) { const [fx, fz] = super.magneticForce(px, pz); return [fx * MARBLES.power, fz * MARBLES.power]; }
+  frictionAt() { return MARBLES.rolling; }
+}
 const U = MARBLES.unit;
 const KEY = 'terrarium.marbles';
 const RED = 0xff5a4e, BLUE = 0x4ea1ff;
@@ -63,7 +71,7 @@ export class Marbles {
     const b = bounds(space.maze);
     // the board: the maze, in units, centered where the maze is
     this.cx = (b.x0 + b.x1) / 2; this.cz = (b.z0 + b.z1) / 2;
-    this.world = new World({
+    this.world = new MazeWorld({
       name: 'Terrarium', size: [(b.x1 - b.x0) / U, (b.z1 - b.z0) / U], start: [-this.cx / U, -this.cz / U],
       goal: { x: 1e6, z: 1e6, r: 0 }, budget: MARBLES.magnets,
       walls: space.boxes.map(w => ({ x: (w.x - this.cx) / U, z: (w.z - this.cz) / U, w: w.hw * 2 / U, d: w.hd * 2 / U })),
