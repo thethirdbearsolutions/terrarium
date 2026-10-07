@@ -19,6 +19,17 @@ const BUILTIN = { files: mountFiles, clock: mountClock, progman: mountProgman, c
 const MAX_MARGIN = 10;                    // around a maximized window, in screen px
 const MAX_NEAR = 0.6;                     // a maximized window's distance, as a share of D
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const THROW_WINDOW = 90;                  // ms of a held window's travel that a throw takes its speed from
+
+/** The speed a window leaves the hand with: its travel over the last moment. */
+function throwOf(trail) {
+  const still = { vx: 0, vz: 0, w: 0 };
+  if (!trail || trail.length < 2) return still;
+  const a = trail[0], z = trail[trail.length - 1], dt = (z.t - a.t) / 1000;
+  // held still a moment before letting go: set down
+  if (dt <= 0 || performance.now() - z.t > THROW_WINDOW) return still;
+  return { vx: (z.x - a.x) / dt, vz: (z.z - a.z) / dt, w: wrap(z.yaw - a.yaw) / dt };
+}
 
 /** A dialog rides in front of the window that asked for it, or of the eye. */
 export class Dialog extends Win {
@@ -185,6 +196,12 @@ export class Shell {
     w.size(innerWidth - MAX_MARGIN * 2, innerHeight - MAX_MARGIN * 2);
     w.resync = true;
     w.resized();
+  }
+
+  /** Where a window is from where you stand: { side, ahead, turn }, to carry it there. */
+  carryFrom(w) {
+    const p = this.space.player, F = p.forward, R = p.right, dx = w.x - p.x, dz = w.z - p.z;
+    return { side: dx * R.x + dz * R.z, ahead: Math.max(this.space.D * 0.4, dx * F.x + dz * F.z), turn: wrap(w.yaw - p.yaw) };
   }
 
   /** Go and stand square in front of a window, where it's sharp. */
@@ -360,20 +377,23 @@ export class Shell {
       }
       const b = w.slab;
       b.hw = w.w / 2; b.hh = w.h / 2; b.ht = THICK / 2; b.y = w.y;
+      if (w.carry) {
+        // carried: where it is from you, so it comes along as you walk
+        const c = w.carry, F = p.forward, R = p.right;
+        w.hand.x = p.x + R.x * c.side + F.x * c.ahead;
+        w.hand.z = p.z + R.z * c.side + F.z * c.ahead;
+        w.hand.yaw = p.yaw + c.turn;
+      }
       if (w.hand) {
         // held: it goes where the hand puts it, at whatever speed that takes, unless a wall's in the way
         const hand = w.hand;
         b.kinematic = true;
         b.vx = (hand.x - b.x) / dt; b.vz = (hand.z - b.z) / dt; b.w = wrap(hand.yaw - b.yaw) / dt;
-        const a = 0.35;
-        w.fling = w.fling
-          ? { vx: w.fling.vx + (b.vx - w.fling.vx) * a, vz: w.fling.vz + (b.vz - w.fling.vz) * a, w: w.fling.w + (b.w - w.fling.w) * a }
-          : { vx: b.vx, vz: b.vz, w: b.w };
       } else if (b.kinematic) {
-        // let go: thrown with the hand's recent speed
+        // let go: thrown with how it moved over the last moment, or set down if it was still
         b.kinematic = false;
-        Object.assign(b, w.fling || { vx: 0, vz: 0, w: 0 });
-        w.fling = null;
+        Object.assign(b, throwOf(w.trail));
+        w.trail = null;
       }
     }
 
@@ -382,10 +402,16 @@ export class Shell {
     if (p.walking || p.glide) this.saveLayout();
 
     let moving = false;
+    const now = performance.now();
     for (const w of live) {
       const b = w.slab;
       w.x = b.x; w.z = b.z; w.yaw = wrap(b.yaw);
       if (!w.hand) moving ||= b.moving;
+      else if (w.dragging) {
+        // where it's really been, walls and all, for the throw
+        (w.trail ||= []).push({ t: now, x: b.x, z: b.z, yaw: b.yaw });
+        while (w.trail.length > 2 && now - w.trail[1].t > THROW_WINDOW) w.trail.shift();
+      }
     }
     if (moving) this.saveLayout();
 

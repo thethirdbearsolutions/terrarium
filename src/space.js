@@ -27,6 +27,22 @@ const MAP_PITCH = -1.08;        // how steeply the map looks down
 const MAP_WALLS = 0.28;         // how tall the walls stand in the map, as a share
 const FOG = { near: 2600, far: 17000 };
 
+const SHADOW = { dark: 0.5, fade: 1500 };   // how dark a window's shadow is standing on the floor, and how high it fades out
+const THICK_SHADOW = 14;
+const SHADOW_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+let shadowTex = null;
+/** A soft-edged blot, the same for every shadow. */
+function shadowTexture() {
+  if (shadowTex) return shadowTex;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const x = c.getContext('2d');
+  x.filter = 'blur(9px)';
+  x.fillStyle = '#fff';
+  x.fillRect(22, 22, 84, 20);
+  shadowTex = new THREE.CanvasTexture(c);
+  return shadowTex;
+}
+
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const ease = (t) => t * t * (3 - 2 * t);
 const shade = (hex, k) => { const c = new THREE.Color(hex); return c.multiplyScalar(k); };
@@ -235,14 +251,40 @@ export class Space {
     g.menu.renderOrder = -2;
     g.menu.visible = false;
     g.add(g.slab, g.menu);
-    this.scene.add(g);
+    g.shadow = new THREE.Mesh(SHADOW_GEO, new THREE.MeshBasicMaterial({ color: 0x000000, map: shadowTexture(), transparent: true, depthWrite: false }));
+    g.shadow.renderOrder = 1;
+    g.shadow.visible = false;
+    this.scene.add(g, g.shadow);
     return g;
   }
 
   /** Make an occluder punch through everything (icons, dialogs) or not. */
   punch(g, on) { g.slab.material = on ? PUNCH : DEPTH; g.slab.renderOrder = on ? -2 : -1; }
 
-  dropOccluder(g) { this.scene.remove(g); g.slab.geometry.dispose(); g.menu.geometry.dispose(); }
+  dropOccluder(g) {
+    this.scene.remove(g, g.shadow);
+    g.slab.geometry.dispose(); g.menu.geometry.dispose(); g.shadow.geometry.dispose(); g.shadow.material.dispose();
+  }
+
+  /**
+   * A window's shadow on the floor under it, from a light overhead: sharp and
+   * dark when the window stands low, wider and fainter the higher it floats.
+   */
+  shadowOf(g, c, w, h, scale) {
+    const s = g.shadow, gap = Math.max(0, c.y - h / 2 * scale - FLOOR_Y);
+    const spread = 40 + gap * 0.35;
+    s.visible = true;
+    s.position.set(c.x, FLOOR_Y + 2, c.z);
+    s.rotation.set(0, c.yaw, 0);
+    s.scale.set((w * scale + spread) * 1.3, 1, (THICK_SHADOW + spread) * 2.4);   // the blot fills the middle of its texture
+    s.material.opacity = SHADOW.dark * Math.max(0, 1 - gap / SHADOW.fade);
+  }
+
+  /** How far into the fog a point is, 0 to 1, as the GL fog has it. */
+  fogAt(p) {
+    const f = this.scene.fog, d = this.toView(p).ahead;
+    return Math.max(0, Math.min(1, (d - f.near) / (f.far - f.near)));
+  }
 
   // ---- the view -------------------------------------------------------------
 

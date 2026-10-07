@@ -38,6 +38,9 @@
   .win .edge.t, .win .edge.b { left: 0; right: 0; height: var(--thick); background: linear-gradient(var(--shadow), var(--face) 30%, var(--face) 70%, var(--shadow)); }
   .win .edge.t { top: calc(var(--half) * -1); transform: rotateX(90deg); }
   .win .edge.b { bottom: calc(var(--half) * -1); transform: rotateX(-90deg); }
+  /* the light it stands in: fog over shade, laid over everything on a face or edge */
+  .win .face::after, .win .edge::after { content: ''; position: absolute; inset: -1px; z-index: 9; pointer-events: none;
+    background: linear-gradient(rgb(var(--fogc, 0 0 0) / var(--fog, 0)), rgb(var(--fogc, 0 0 0) / var(--fog, 0))), rgb(0 0 0 / var(--shade, 0)); }
 
   .bar { flex: none; height: 20px; display: flex; align-items: stretch; background: #fff; color: #000; border-bottom: 1px solid var(--dark); cursor: default; }
   .win.focused .bar, .dialog .bar { background: var(--navy); color: #fff; }

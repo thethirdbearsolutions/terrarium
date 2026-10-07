@@ -19,6 +19,11 @@ export const ICON = { w: 76, h: 58 };   // one minimized window's slot
 const ICON_NEAR = 0.05;    // the icons' distance, as a fraction of D: nearer than you can get to a window
 const MAX_NEAR = 0.6;      // a maximized window's
 const CORNER = 20;         // how far along an edge the corner's sizing reaches
+const SHADE = 0.14;        // how much darker a window square to z is than one square to x, as with the walls
+export const CARRY = {
+  push: 260,               // screen px dragged up to carry a window e times further off
+  near: 0.4, far: 12,      // how near and far you can hold one, as shares of D
+};
 
 let nextId = 1;
 
@@ -87,9 +92,10 @@ export class Win {
       b.addEventListener('wheel', (e) => {
         e.preventDefault();
         if (this.maximized) return;
-        // push it away or pull it near, along the line of sight
-        const F = shell.space.player.forward, d = e.deltaY * 1.2;
-        this.x += F.x * d; this.z += F.z * d; this.resync = true; shell.saveLayout();
+        // raise it or lower it
+        this.y = Math.max(-480, Math.min(560, this.y - e.deltaY * 0.6));
+        if (this.hand) this.hand.y = this.y;
+        shell.saveLayout();
       }, { passive: false });
       b.addEventListener('contextmenu', (e) => e.preventDefault());
       b.querySelectorAll('button').forEach(btn => {
@@ -237,7 +243,8 @@ export class Win {
   letGo(thrown = true) {
     this.dragging = false;
     this.hand = null;
-    if (!thrown) { this.fling = null; this.resync = true; }
+    this.carry = null;
+    if (!thrown) { this.trail = null; this.resync = true; }
   }
 
   /** Across the face, left to right as you look at the front. */
@@ -254,26 +261,30 @@ export class Win {
     return Math.max(0.05, ahead / sp.D);
   }
 
+  /**
+   * Pick it up by the bar. It's held where it is relative to you, so it comes
+   * along as you walk; across moves it across, up pushes it away and down
+   * pulls it near. Let go while it's moving and it's thrown.
+   */
   barDown(e) {
     if (e.target.closest('button') || this.minimized) return;
     e.preventDefault(); e.stopPropagation();
     this.shell.focus(this);
     if (this.maximized) return;
-    const turning = e.button === 2 || e.altKey;
+    const turning = e.button === 2 || e.altKey, sp = this.shell.space;
     this.hold();
-    const sx = e.clientX, sy = e.clientY, k = this.scale;
-    const start = { ...this.hand };
-    const R = this.shell.space.player.right;
-    let moved = false;
+    const c = this.carry = this.shell.carryFrom(this);
+    let px = e.clientX, py = e.clientY, moved = false;
+    const sx = px, sy = py;
     document.body.classList.add('dragging');
     const move = (ev) => {
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      if (turning) this.hand.yaw = start.yaw - dx / 220;
+      const dx = ev.clientX - px, dy = ev.clientY - py;
+      px = ev.clientX; py = ev.clientY;
+      if (Math.abs(px - sx) + Math.abs(py - sy) > 3) moved = true;
+      if (turning) c.turn -= dx / 220;
       else {
-        // in the plane facing you
-        this.hand.x = start.x + R.x * dx * k; this.hand.z = start.z + R.z * dx * k;
-        this.hand.y = this.y = start.y - dy * k;
+        c.side += dx * Math.max(0.05, c.ahead / sp.D);
+        c.ahead = Math.max(sp.D * CARRY.near, Math.min(sp.D * CARRY.far, c.ahead * Math.exp(-dy / CARRY.push)));
       }
     };
     const up = () => {
@@ -406,6 +417,30 @@ export class Win {
     o.slab.scale.set(w, h, this.minimized ? 1 : THICK);
     sp.punch(o, !!t.punch);
     this.menuOccluder();
+
+    // standing in the maze it's in the same light as the walls: a shadow under
+    // it, a little shade turned the way the walls are shaded, and the fog
+    const inWorld = shown && !this.minimized && !this.maximized && !t.punch;
+    if (inWorld) sp.shadowOf(o, c, this.w, this.h, c.scale);
+    else o.shadow.visible = false;
+    let fog = 0, shade = 0;
+    if (inWorld) {
+      fog = sp.fogAt(c);
+      // none where you'd read it, all of it a few steps further off
+      const off = Math.hypot(c.x - eye.x, c.z - eye.z) / sp.D;
+      shade = SHADE * Math.cos(yaw) ** 2 * Math.max(0, Math.min(1, (off - 1.3) / 1.3));
+    }
+    this.tint(fog, shade, sp.scene.fog.color);
+  }
+
+  /** Lay the fog and the shade over its faces and edges. */
+  tint(fog, shade, color) {
+    const f = fog.toFixed(3), s = shade.toFixed(3), rgb = `${Math.round(color.r * 255)} ${Math.round(color.g * 255)} ${Math.round(color.b * 255)}`;
+    if (f === this.tinted?.f && s === this.tinted.s && rgb === this.tinted.rgb) return;
+    this.tinted = { f, s, rgb };
+    this.el.style.setProperty('--fog', f);
+    this.el.style.setProperty('--shade', s);
+    this.el.style.setProperty('--fogc', rgb);
   }
 
   /** Is any of it in front of the eye and not behind a wall? */

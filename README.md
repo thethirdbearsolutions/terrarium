@@ -25,7 +25,7 @@ one (Program Manager, File Manager, Control Panel, Clock).
 |---|---|
 | ↑ / W, ↓ / S | walk forward, back |
 | ← → | turn |
-| A D, Alt+← Alt+→ | step sideways |
+| A D, Shift+← Shift+→ (or Alt) | step sideways |
 | drag the floor | turn |
 | scroll on the floor | walk forward, back |
 | click a title bar | walk up to that window and stand square in front of it |
@@ -45,10 +45,12 @@ movement key stops a walk that's taking you somewhere.
   (walks you there), End Task, Cascade (stacked in front of you, each
   further back), Tile (side by side around you) and Arrange Icons.
   Program Manager is always on it, so a closed one can come back.
-- Drag a window by its title bar to move it across your view; double-click
-  the bar to maximize. Drag any edge or corner of the border to size it.
-  Scroll on the bar to push it away or pull it near; right-drag (or
-  Alt-drag) the bar to turn it.
+- Pick a window up by its title bar. Drag across to move it across, up to
+  push it away, down to pull it near. It stays where it is from you while
+  you hold it, so you can walk or turn with it. Let go while it's moving
+  and it's thrown. Double-click the bar to maximize. Drag any edge or
+  corner of the border to size it. Scroll on the bar to raise or lower it;
+  right-drag (or Alt-drag) the bar to turn it.
 - ▼ minimizes a window to an icon along the bottom of the view, which goes
   where you go; click the icon for its control menu, double-click it to
   restore it in front of you. ▲ maximizes to fill the view; Restore puts it
@@ -60,7 +62,8 @@ movement key stops a walk that's taking you somewhere.
   write on the back; F5 puts in the time and date.
 - Windows are solid. One that would pass through another is pushed back or
   aside instead, and a thrown one knocks the others about and bounces off
-  the walls.
+  the walls. Each casts a shadow on the floor, fainter the higher it
+  floats, and is lit and fogged like the walls around it.
 - File Manager shows the files as drive c:, opens them with their app, and
   imports, exports, renames and deletes. Files dropped onto the floor land
   in `c:\documents`.

@@ -24,8 +24,10 @@ export const MOVE = {
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const KEYS = {
   ArrowUp: 'fwd', KeyW: 'fwd', ArrowDown: 'back', KeyS: 'back',
-  KeyA: 'left', KeyD: 'right',
+  KeyA: 'left', KeyD: 'right', ArrowLeft: 'turnL', ArrowRight: 'turnR',
 };
+// with Shift or Alt held, the turning keys step sideways instead
+const SIDESTEP = { turnL: 'left', turnR: 'right' };
 
 export class Player {
   constructor({ x = 0, z = 0, yaw = 0 } = {}) {
@@ -35,6 +37,7 @@ export class Player {
     this.yaw = yaw;
     this.f = 0; this.s = 0; this.t = 0;   // forward, rightward and turning speeds
     this.held = new Map();                // key code -> action
+    this.side = false;                    // Shift or Alt: turning keys step sideways
     this.push = 0;                        // px still to walk from the wheel
     this.glide = null;
   }
@@ -54,16 +57,15 @@ export class Player {
 
   /** A key went down; true if it was one of ours. */
   keyDown(e) {
-    let a = KEYS[e.code];
-    if (e.code === 'ArrowLeft') a = e.altKey ? 'left' : 'turnL';
-    if (e.code === 'ArrowRight') a = e.altKey ? 'right' : 'turnR';
+    this.side = e.shiftKey || e.altKey;
+    const a = KEYS[e.code];
     if (!a || e.ctrlKey || e.metaKey) return false;
     this.held.set(e.code, a);
     this.glide = null;
     return true;
   }
-  keyUp(e) { this.held.delete(e.code); }
-  release() { this.held.clear(); }
+  keyUp(e) { this.side = e.shiftKey || e.altKey; this.held.delete(e.code); }
+  release() { this.held.clear(); this.side = false; }
   get walking() { return this.held.size > 0; }
 
   /** Walk this far forward (negative: back), a bit at a time. */
@@ -80,7 +82,7 @@ export class Player {
 
   /** Set the body's velocity for the coming step and turn. */
   update(dt) {
-    const act = new Set(this.held.values());
+    const act = new Set([...this.held.values()].map(a => (this.side && SIDESTEP[a]) || a));
     const has = (a) => act.has(a);
     const k = 1 - Math.exp(-dt * MOVE.accel), kt = 1 - Math.exp(-dt * MOVE.turnAccel);
     if (this.glide) return this.steer(dt);
