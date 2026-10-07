@@ -83,8 +83,10 @@ put a magnet down (Shift-click for a blue one), click a magnet to flip it,
 drag it to move it, Alt-click or right-click it to pick it up. Red pushes
 the marble, blue pulls it; six can be down at once, and a seventh takes up
 the oldest. The walls stop it, you kick it by walking into it, and a window
-lowered far enough to meet it (scroll on its bar) is a wall too, and a
-paddle while it moves. Drag the floor down to look down at it.
+lowered far enough to meet it is a wall too, a bouncier one than the maze's,
+and a paddle while it moves. Magnets slide: a low window or your feet shove
+them, a window is knocked back by one, and they stop on the walls and on
+each other. Drag the floor down to look down at it.
 
 The marble's physics is Magnimarbles' own `src/physics.js`, imported from
 a pinned commit through the import map in `index.html`; move the pin to

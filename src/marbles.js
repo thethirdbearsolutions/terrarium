@@ -16,7 +16,12 @@ import { THICK } from './window.js';
 export const MARBLES = {
   unit: 150,          // CSS px per Magnimarbles unit: the marble is 150px across
   magnets: 6,         // how many you can have down at once; one more takes up the oldest
-  kick: 18,           // fastest a window or a walker moves the marble, in units/s
+  kick: 30,           // fastest a window or a walker moves the marble, in units/s
+  bounce: 0.9,        // how lively a window or a walker is to the marble (the maze's walls stay at Magnimarbles' 0.6)
+  magnetMass: 8,      // as the windows reckon mass: a 400×300 window is 48
+  magnetDrag: 1.5,      // floor: magnet speed lost per second, proportionally
+  magnetStop: 1.5,    // and units/s lost per second outright
+  magnetBounce: 0.4,
   power: 5,           // magnets, as many times as strong as on a Magnimarbles board: the maze is a big floor
   rolling: 0.02,      // rolling resistance, as Magnimarbles' MU_FLOOR (0.08 there)
 };
@@ -151,10 +156,97 @@ export class Marbles {
     // a toy, not a level: no goal, no clock, never over
     w.state = ALIVE; w.time = 0; w.restTime = 0;
     if (w.trail.length > 8) w.trail.splice(0, w.trail.length - 8);
+    if (this.slide(dt)) this.saveSoon();
     w.setDynamicWalls(this.movers());
     w.step(dt);
     this.draw();
     if (w.marble.speed() > 0.05) this.saveSoon();
+  }
+
+  /**
+   * Magnets slide when something hits them: windows low enough to meet one
+   * shove it and are knocked back, you shove it walking, and it stops on the
+   * maze's walls and the other magnets. True while any is moving.
+   */
+  slide(dt) {
+    const mags = this.world.magnets, r = MAGNET_RADIUS * U;
+    if (!mags.length) return false;
+    const top = this.floorY + 0.5 * U;   // a magnet stands half a unit tall
+    const hitters = [this.space.player.body, ...this.shell.inMaze().filter(w => w.slab && w.y - w.h / 2 < top).map(w => w.slab)];
+    let moving = false;
+    for (const m of mags) {
+      m.vx ||= 0; m.vz ||= 0;
+      const sp = Math.hypot(m.vx, m.vz);
+      if (sp > 0) {
+        const nsp = Math.max(0, sp * Math.exp(-MARBLES.magnetDrag * dt) - MARBLES.magnetStop * dt);
+        m.vx *= nsp / sp; m.vz *= nsp / sp;
+        m.x += m.vx * dt; m.z += m.vz * dt;
+      }
+      for (const b of hitters) this.knock(m, b, r);
+      for (const box of this.space.boxes) this.stop(m, box, r);
+      moving ||= Math.hypot(m.vx, m.vz) > 0.05;
+    }
+    // magnet against magnet: the same mass, so they trade what's along the line between them
+    for (let i = 0; i < mags.length; i++) for (let j = i + 1; j < mags.length; j++) {
+      const a = mags[i], b = mags[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), min = 2 * MAGNET_RADIUS;
+      if (d >= min || d < 1e-9) continue;
+      const n = { x: dx / d, z: dz / d }, push = (min - d) / 2;
+      a.x -= n.x * push; a.z -= n.z * push; b.x += n.x * push; b.z += n.z * push;
+      const vn = (b.vx - a.vx) * n.x + (b.vz - a.vz) * n.z;
+      if (vn < 0) {
+        const j = -(1 + MARBLES.magnetBounce) * vn / 2;
+        a.vx -= n.x * j; a.vz -= n.z * j; b.vx += n.x * j; b.vz += n.z * j;
+      }
+    }
+    return moving;
+  }
+
+  /** A magnet (in units) against a window's or a walker's slab (in px): an impulse each way, and apart. */
+  knock(m, b, r) {
+    const c = this.toWorld(m.x, m.z), A = b.axis, N0 = b.normal;
+    const dx = c.x - b.x, dz = c.z - b.z, lx = dx * A.x + dz * A.z, lz = dx * N0.x + dz * N0.z;
+    const qx = Math.max(-b.hw, Math.min(b.hw, lx)), qz = Math.max(-b.ht, Math.min(b.ht, lz));
+    const ex = lx - qx, ez = lz - qz, d = Math.hypot(ex, ez);
+    if (d >= r) return;
+    let n, depth;
+    if (d > 1e-6) { n = { x: ex / d, z: ez / d }; depth = r - d; }
+    else {
+      // its middle is inside: out through the nearer side
+      const ox = b.hw - Math.abs(lx), oz = b.ht - Math.abs(lz);
+      if (ox < oz) { n = { x: Math.sign(lx) || 1, z: 0 }; depth = ox + r; } else { n = { x: 0, z: Math.sign(lz) || 1 }; depth = oz + r; }
+    }
+    // from the slab toward the magnet, in the world; and where they touch
+    const W = { x: n.x * A.x + n.z * N0.x, z: n.x * A.z + n.z * N0.z };
+    const p = { x: b.x + qx * A.x + qz * N0.x, z: b.z + qx * A.z + qz * N0.z };
+    const im = 1 / MARBLES.magnetMass, ib = b.invMass, vb = b.velocityAt(p);
+    const vn = (m.vx * U - vb.x) * W.x + (m.vz * U - vb.z) * W.z;
+    if (vn < 0) {
+      const lever = (p.z - b.z) * W.x - (p.x - b.x) * W.z;
+      const j = -(1 + MARBLES.magnetBounce) * vn / (im + ib + lever * lever * b.invInertia);
+      m.vx += W.x * j * im / U; m.vz += W.z * j * im / U;
+      b.hit({ x: -W.x * j, z: -W.z * j }, p);
+    }
+    const share = im / (im + ib);
+    m.x += W.x * depth * share / U; m.z += W.z * depth * share / U;
+    b.x -= W.x * depth * (1 - share); b.z -= W.z * depth * (1 - share);
+  }
+
+  /** A magnet (in units) against a maze wall box (in px): out, and bounced. */
+  stop(m, box, r) {
+    const c = this.toWorld(m.x, m.z);
+    if (Math.abs(c.x - box.x) > box.hw + r || Math.abs(c.z - box.z) > box.hd + r) return;
+    const qx = Math.max(box.x - box.hw, Math.min(box.x + box.hw, c.x)), qz = Math.max(box.z - box.hd, Math.min(box.z + box.hd, c.z));
+    const ex = c.x - qx, ez = c.z - qz, d = Math.hypot(ex, ez);
+    if (d >= r) return;
+    let n, depth;
+    if (d > 1e-6) { n = { x: ex / d, z: ez / d }; depth = r - d; }
+    else {
+      const ox = box.hw - Math.abs(c.x - box.x), oz = box.hd - Math.abs(c.z - box.z);
+      if (ox < oz) { n = { x: Math.sign(c.x - box.x) || 1, z: 0 }; depth = ox + r; } else { n = { x: 0, z: Math.sign(c.z - box.z) || 1 }; depth = oz + r; }
+    }
+    m.x += n.x * depth / U; m.z += n.z * depth / U;
+    const vn = m.vx * n.x + m.vz * n.z;
+    if (vn < 0) { m.vx -= (1 + MARBLES.magnetBounce) * vn * n.x; m.vz -= (1 + MARBLES.magnetBounce) * vn * n.z; }
   }
 
   /** You, and the windows low enough to meet the marble, as walls that move. */
@@ -165,12 +257,12 @@ export class Marbles {
     };
     const top = this.floorY + MARBLE_RADIUS * 2 * U, list = [];
     const p = this.space.player.body, me = this.toBoard(p.x, p.z);
-    list.push({ ...me, w: p.hw * 2 / U, d: p.ht * 2 / U, a: 0, ...cap(p.vx, p.vz) });
+    list.push({ ...me, w: p.hw * 2 / U, d: p.ht * 2 / U, a: 0, ...cap(p.vx, p.vz), restitution: MARBLES.bounce });
     for (const win of this.shell.inMaze()) {
       const b = win.slab;
       if (!b || win.y - win.h / 2 > top) continue;
       const at = this.toBoard(b.x, b.z);
-      list.push({ ...at, w: win.w / U, d: THICK / U, a: -b.yaw, ...cap(b.vx, b.vz), window: true });
+      list.push({ ...at, w: win.w / U, d: THICK / U, a: -b.yaw, ...cap(b.vx, b.vz), restitution: MARBLES.bounce, window: true });
     }
     return list;
   }
