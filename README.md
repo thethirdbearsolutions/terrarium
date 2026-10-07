@@ -48,9 +48,11 @@ movement key stops a walk that's taking you somewhere.
 - Pick a window up by its title bar. Drag across to move it across, up to
   push it away, down to pull it near. It stays where it is from you while
   you hold it, so you can walk or turn with it. Let go while it's moving
-  and it's thrown. Double-click the bar to maximize. Drag any edge or
-  corner of the border to size it. Scroll on the bar to raise or lower it;
-  right-drag (or Alt-drag) the bar to turn it.
+  and it's thrown. Hold Shift while you drag and up and down raise and
+  lower it instead, or scroll while you hold it; scrolling on the bar
+  does the same. Double-click the bar to maximize. Drag any edge or
+  corner of the border to size it. Right-drag (or Alt-drag) the bar to
+  turn it.
 - ▼ minimizes a window to an icon along the bottom of the view, which goes
   where you go; click the icon for its control menu, double-click it to
   restore it in front of you. ▲ maximizes to fill the view; Restore puts it

@@ -93,9 +93,7 @@ export class Win {
       b.addEventListener('wheel', (e) => {
         e.preventDefault();
         if (this.maximized) return;
-        // raise it or lower it
-        this.y = Math.max(FLOOR_Y + this.h / 2 + 2, Math.min(CEIL_Y - this.h / 2 - 2, this.y - e.deltaY * 0.6));
-        if (this.hand) this.hand.y = this.y;
+        this.lift(-e.deltaY * 0.6);
         shell.saveLayout();
       }, { passive: false });
       b.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -283,13 +281,20 @@ export class Win {
       px = ev.clientX; py = ev.clientY;
       if (Math.abs(px - sx) + Math.abs(py - sy) > 3) moved = true;
       if (turning) c.turn -= dx / 220;
-      else {
+      else if (ev.shiftKey) {
+        // Shift: up and down raise and lower it, under the pointer
+        c.side += dx * Math.max(0.05, c.ahead / sp.D);
+        this.lift(-dy * Math.max(0.05, c.ahead / sp.D));
+      } else {
         c.side += dx * Math.max(0.05, c.ahead / sp.D);
         c.ahead = Math.max(sp.D * CARRY.near, Math.min(sp.D * CARRY.far, c.ahead * Math.exp(-dy / CARRY.push)));
       }
     };
+    // scrolling anywhere while it's held raises and lowers it
+    const wheel = (ev) => { ev.preventDefault(); ev.stopPropagation(); this.lift(-ev.deltaY * 0.6); moved = true; };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      removeEventListener('wheel', wheel, { capture: true });
       document.body.classList.remove('dragging');
       this.letGo(moved);
       // a click on the bar, not a drag: go and stand square in front of it
@@ -297,6 +302,13 @@ export class Win {
       this.shell.saveLayout();
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
+    addEventListener('wheel', wheel, { capture: true, passive: false });
+  }
+
+  /** Raise it (or lower it, dy < 0) by dy, between the floor and the ceiling. */
+  lift(dy) {
+    this.y = Math.max(FLOOR_Y + this.h / 2 + 2, Math.min(CEIL_Y - this.h / 2 - 2, this.y + dy));
+    if (this.hand) this.hand.y = this.y;
   }
 
   /** Drag the sizing border; dir is the edge or corner, as compass points. */
