@@ -171,7 +171,7 @@ export class Marbles {
     const mags = this.world.magnets, r = MAGNET_RADIUS * U;
     if (!mags.length) return false;
     const top = this.floorY + 0.5 * U;   // a magnet stands half a unit tall
-    const hitters = [this.space.player.body, ...this.shell.solids().filter(b => b.y - b.hh < top)];
+    const hitters = [this.space.player.body, ...(this.shell.companions?.bodies() || []), ...this.shell.solids().filter(b => b.y - b.hh < top)];
     let moving = false;
     for (const m of mags) {
       m.vx ||= 0; m.vz ||= 0;
@@ -255,8 +255,10 @@ export class Marbles {
       return { vx: vx / U * k, vz: vz / U * k };
     };
     const top = this.floorY + MARBLE_RADIUS * 2 * U, list = [];
-    const p = this.space.player.body, me = this.toBoard(p.x, p.z);
-    list.push({ ...me, w: p.hw * 2 / U, d: p.ht * 2 / U, a: 0, ...cap(p.vx, p.vz), restitution: MARBLES.bounce });
+    const p = this.space.player.body;
+    for (const b of [p, ...(this.shell.companions?.bodies() || [])]) {
+      list.push({ ...this.toBoard(b.x, b.z), w: b.hw * 2 / U, d: b.ht * 2 / U, a: 0, ...cap(b.vx, b.vz), restitution: MARBLES.bounce });
+    }
     for (const b of this.shell.solids()) {
       if (b.y - b.hh > top) continue;
       const at = this.toBoard(b.x, b.z);

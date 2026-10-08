@@ -106,6 +106,22 @@ The marble's physics is Magnimarbles' own `src/physics.js`, imported from
 a pinned commit through the import map in `index.html`; move the pin to
 take a newer one.
 
+## Companions
+
+A turtle, a cat and a bear cub live in the maze. The turtle keeps you
+company, the cat chases the marble and kicks it, and the bear goes and sits
+by the games you've brought home or wanders. They're solid, so they knock
+windows, boxes, magnets and the marble about. Click one and it hops and
+comes over.
+
+They're drawn in pxart: the sources are `sprites/turtle.px`, `cat.px` and
+`bear.px` (front, back and side walks and a front idle; the left side is
+the right mirrored). After changing one, export the sheet the shell loads:
+
+    pxart export sprites/turtle.px sprites/cat.px sprites/bear.px --prefix-file --aseprite sprites/companions.json
+
+Their speeds and sizes are `KINDS` in `src/companions.js`.
+
 ## The maze
 
 `MAZE` in `src/maze.js` holds the seed, the size in cells, the cell and

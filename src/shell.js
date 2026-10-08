@@ -434,7 +434,8 @@ export class Shell {
     }
 
     p.update(dt);
-    step([p.body, ...live.map(w => w.slab)], dt, sp.walls);
+    this.companions?.steer(dt);
+    step([p.body, ...(this.companions?.bodies() || []), ...live.map(w => w.slab)], dt, sp.walls);
     if (p.walking || p.glide) this.saveLayout();
 
     let moving = false;

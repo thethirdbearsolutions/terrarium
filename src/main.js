@@ -4,13 +4,15 @@ import { closeMenus, menuOpen } from './menu.js';
 import * as fs from './fs.js';
 import * as maze from './maze.js';
 import { Marbles } from './marbles.js';
+import { Companions } from './companions.js';
 import { FLOOR_Y } from './space.js';
 import { MOVE } from './player.js';
 
 const space = new Space(document.getElementById('gl'), document.getElementById('css'));
 const shell = new Shell(space);
 const marbles = new Marbles(space, shell, FLOOR_Y);
-window.__terrarium = { space, shell, fs, APPS, maze, marbles };
+const companions = shell.companions = new Companions(space, shell, marbles, FLOOR_Y);
+window.__terrarium = { space, shell, fs, APPS, maze, marbles, companions };
 
 // ---- the empty world: the floor, the walls, the sky -----------------------------
 
@@ -83,6 +85,10 @@ addEventListener('pointerdown', (e) => {
 
 addEventListener('pointerdown', (e) => {
   if (!isBackground(e.target) || (e.button !== 0 && e.button !== 2)) return;
+  if (!space.overTarget && e.button === 0) {
+    const c = companions.at(e.clientX, e.clientY);
+    if (c) { e.preventDefault(); c.pet(); return; }
+  }
   if (!space.overTarget && grabMagnet(e)) return;
   if (e.button === 0) grabWorld(e);
 });
@@ -187,6 +193,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   shell.update(dt);
   marbles.update(dt);
+  companions.draw(dt);
   space.render();
   requestAnimationFrame(frame);
 }
