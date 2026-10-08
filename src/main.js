@@ -190,7 +190,8 @@ closeMenus();
 
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // the first frame's time can be a little before the start's
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   shell.update(dt);
   marbles.update(dt);
   companions.draw(dt);

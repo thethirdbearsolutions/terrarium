@@ -19,9 +19,9 @@ const PX = 24;   // a frame's size in sprite pixels
 
 /** Who lives here, and how each one gets about. */
 export const KINDS = {
-  turtle: { scale: 9, speed: 260, size: 90, near: 650, far: 1300 },
-  cat: { scale: 9, speed: 900, size: 70, near: 400, far: 900 },
-  bear: { scale: 12, speed: 420, size: 110, near: 500, far: 1100 },
+  turtle: { scale: 16, speed: 300, size: 170, near: 800, far: 1500 },
+  cat: { scale: 16, speed: 1000, size: 130, near: 600, far: 1100 },
+  bear: { scale: 21, speed: 460, size: 200, near: 700, far: 1300 },
 };
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -166,18 +166,18 @@ class Companion {
     this.anim += dt * (walking ? speed / this.k.speed : 1);
     const frames = w.tags[tag] || w.tags[`${this.kind}/idle/down`];
     const per = frames[0].ms / 1000;
-    const f = frames[Math.floor(this.anim / per) % frames.length];
+    const f = frames[Math.max(0, Math.floor(this.anim / per)) % frames.length];
     const W = w.sheetSize.w, H = w.sheetSize.h;
     this.tex.repeat.set((mirror ? -1 : 1) * PX / W, PX / H);
     this.tex.offset.set((f.x + (mirror ? PX : 0)) / W, 1 - (f.y + PX) / H);
 
     // standing on the floor, turned to face you, hopping when petted
     if (this.hop > 0) this.hop = Math.max(0, this.hop - dt);
-    const lift = Math.sin(Math.min(1, 1 - this.hop / 0.45) * Math.PI) * (this.hop > 0 ? 120 : 0);
+    const lift = Math.sin(Math.min(1, 1 - this.hop / 0.45) * Math.PI) * (this.hop > 0 ? 10 * this.k.scale : 0);
     this.mesh.position.set(b.x, w.floorY + lift, b.z);
     this.mesh.rotation.set(0, sp.cam.yaw, 0);
     this.shadow.position.set(b.x, w.floorY + 2, b.z);
-    this.shadow.material.opacity = 0.4 * (1 - lift / 300);
+    this.shadow.material.opacity = 0.4 * (1 - lift / (25 * this.k.scale));
   }
 
   pet() {
@@ -219,7 +219,7 @@ export class Companions {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY)); } catch {}
     const p = this.space.player;
-    const spots = [[-500, -300], [500, -350], [0, 500]];
+    const spots = [[-700, -400], [700, -450], [0, 700]];
     for (const [i, kind] of Object.keys(KINDS).entries()) {
       let s = saved?.find(c => c.kind === kind) || { x: p.x + spots[i][0], z: p.z + spots[i][1], heading: Math.PI / 2 };
       const probe = new Body({ x: s.x, z: s.z, hw: KINDS[kind].size / 2, ht: KINDS[kind].size / 2 });
