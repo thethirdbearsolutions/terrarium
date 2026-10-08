@@ -19,6 +19,13 @@ const isBackground = (t) => t === cssRoot || t === cssRoot.firstChild || t === d
 
 /** Is the pointer on a window, or on a wall that stands in front of it? */
 function hiddenBehindWall(e) {
+  const box = e.target.closest?.('.gbox')?.box;
+  if (box) {
+    // as far off as the box stands, near enough
+    if (space.over > 0.02) return false;
+    const ray = space.ray(e.clientX, e.clientY), d = Math.hypot(box.x - ray.ox, box.z - ray.oz) - 60, n = Math.hypot(ray.dx, ray.dz);
+    return space.wallDistance(ray.ox, ray.oz, ray.dx / n, ray.dz / n) < d;
+  }
   const el = e.target.closest?.('.win');
   const w = el?.win;
   if (!w?.cur || w.minimized || w.maximized || el.classList.contains('dialog') || space.over > 0.02) return false;
@@ -172,6 +179,7 @@ addEventListener('drop', (e) => {
 
 await fs.seed();
 await shell.restoreLayout();
+shell.restoreBoxes();
 closeMenus();
 
 let last = performance.now();

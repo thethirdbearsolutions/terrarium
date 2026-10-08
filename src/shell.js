@@ -13,9 +13,13 @@ import { mountClock } from './clock.js';
 import { mountProgman } from './progman.js';
 import { mountControl } from './control.js';
 import { ask, message, taskList } from './dialogs.js';
+import { GameBox, BOX, saveBoxes, loadBoxes } from './boxes.js';
+import { gameApp } from './games.js';
+import { mountRgg } from './rgg.js';
+import { FLOOR_Y } from './space.js';
 
 const LAYOUT_KEY = 'terrarium.layout';
-const BUILTIN = { files: mountFiles, clock: mountClock, progman: mountProgman, control: mountControl };
+const BUILTIN = { files: mountFiles, clock: mountClock, progman: mountProgman, control: mountControl, rgg: mountRgg };
 const MAX_MARGIN = 10;                    // around a maximized window, in screen px
 const MAX_NEAR = 0.6;                     // a maximized window's distance, as a share of D
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -66,6 +70,7 @@ export class Shell {
   constructor(space) {
     this.space = space;
     this.wins = [];
+    this.boxes = [];      // games brought home, standing in the maze
     this.order = [];      // focus order, most recent first
     this.dialogs = [];
     this.pending = new Map();
@@ -112,7 +117,7 @@ export class Shell {
    */
   freeSpot(ww, hh, y) {
     const sp = this.space, D = sp.D, gap = 16, p = sp.player;
-    const others = this.wins.filter(o => !o.minimized && !o.maximized).map(o => o.slab || this.slabAt(o, o.w, o.h));
+    const others = [...this.wins.filter(o => !o.minimized && !o.maximized).map(o => o.slab || this.slabAt(o, o.w, o.h)), ...this.solids()];
     const ok = (pose) => {
       if (!clearOf(sp.maze, sp.walls, this.slabAt(pose, ww, hh), 8)) return false;
       if (!clearLine(sp.boxes, p, pose, 8)) return false;
@@ -206,6 +211,35 @@ export class Shell {
   }
 
   /** Go and stand square in front of a window, where it's sharp. */
+  // ---- games from Retro Game Generator ------------------------------------------
+
+  /** Play a game in a window: walk to the one that's open, or open it. */
+  play(game) { return this.start(gameApp(game)); }
+
+  /** Its box, set down on the floor in front of you. */
+  bringHome(game) {
+    const sp = this.space, at = sp.inFront(0, sp.D * 0.75, FLOOR_Y + BOX.h / 2 + 1);
+    const { x, z } = this.settle({ ...at, w: BOX.w + BOX.d, h: BOX.h });
+    const box = new GameBox(this, game, { x, z, yaw: at.yaw });
+    this.boxes.push(box);
+    this.saveLayout();
+    return box;
+  }
+
+  putAway(box) {
+    closeMenus();
+    box.drop();
+    this.boxes = this.boxes.filter(b => b !== box);
+    this.saveLayout();
+  }
+
+  restoreBoxes() {
+    for (const s of loadBoxes()) if (s.game?.url) this.boxes.push(new GameBox(this, s.game, s));
+  }
+
+  /** Everything solid standing in the maze, as its physics body: windows and boxes. */
+  solids() { return [...this.inMaze(), ...this.boxes].map(t => t.slab).filter(Boolean); }
+
   /** Windows standing in the maze: not minimized, not maximized. */
   inMaze() { return this.wins.filter(w => w.cur && !w.minimized && !w.maximized); }
 
@@ -368,16 +402,17 @@ export class Shell {
   update(dt) {
     const sp = this.space, p = sp.player;
     const icons = this.wins.filter(w => w.minimized);
-    // a maximized window stands in front of you, out of the world
-    const live = this.wins.filter(w => !w.minimized && !w.maximized);
+    // a maximized window stands in front of you, out of the world; boxes are always in it
+    const live = [...this.wins.filter(w => !w.minimized && !w.maximized), ...this.boxes];
 
     for (const w of live) {
       if (!w.slab || w.resync) {
-        w.slab = this.slabAt(w, w.w, w.h);
+        w.slab = w.makeSlab ? w.makeSlab() : this.slabAt(w, w.w, w.h);
         w.resync = false;
       }
       const b = w.slab;
-      b.hw = w.w / 2; b.hh = w.h / 2; b.ht = THICK / 2; b.y = w.y;
+      if (w.fitSlab) w.fitSlab(b);
+      else { b.hw = w.w / 2; b.hh = w.h / 2; b.ht = THICK / 2; b.y = w.y; }
       if (w.carry) {
         // carried: where it is from you, so it comes along as you walk
         const c = w.carry, F = p.forward, R = p.right;
@@ -418,6 +453,7 @@ export class Shell {
 
     sp.update(dt);
     for (const w of this.wins) w.update(dt, w.target(icons.indexOf(w)));
+    for (const b of this.boxes) b.update(dt);
     if (sp.mapness > 0) sp.setFootprints(this.inMaze().map(w => ({ x: w.cur.x, z: w.cur.z, yaw: w.cur.yaw, w: w.w })));
     for (const d of this.dialogs) d.update(dt, d.target());
   }
@@ -494,6 +530,7 @@ export class Shell {
           v: LAYOUT_V, maze: { seed: m.seed, cols: m.cols, rows: m.rows },
           player: { x: p.x, z: p.z, yaw: p.yaw }, focus: this.order[0]?.id, windows: this.wins.map(w => w.state()),
         }));
+        saveBoxes(this.boxes);
       } catch {}
     }, 200);
   }

@@ -87,6 +87,30 @@
   body.light .icon .label { color: #000; }
   .win.minimized.menu .icon .label { background: var(--navy); color: #fff; }
 
+  /* ---- a game's box ---- */
+  .gbox { position: relative; transform-style: preserve-3d; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .gbox.unseen { visibility: hidden; }
+  .gbox .gf { position: absolute; background-size: 100% 100%; background-color: #f4f1e8; outline: 1px solid rgba(0, 0, 0, .35); image-rendering: auto; }
+  .gbox .gf.lid { background: #e8e3d4; }
+  .gbox .gf::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(rgb(var(--fogc, 0 0 0) / var(--fog, 0)), rgb(var(--fogc, 0 0 0) / var(--fog, 0))), rgb(0 0 0 / var(--shade, 0)); }
+  .gbox .gf.side::after { background: linear-gradient(rgb(var(--fogc, 0 0 0) / var(--fog, 0)), rgb(var(--fogc, 0 0 0) / var(--fog, 0))), rgb(0 0 0 / .18); }
+  .gbox .gf.lid::after { background: linear-gradient(rgb(var(--fogc, 0 0 0) / var(--fog, 0)), rgb(var(--fogc, 0 0 0) / var(--fog, 0))), rgb(255 255 255 / .1); }
+  body.dragging .gbox { cursor: grabbing; }
+
+  /* ---- Retro Game Generator ---- */
+  .rgg-main { flex: 1; min-height: 0; display: flex; gap: 8px; padding: 8px; }
+  .rgg-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .rgg-left input.field { width: 100%; box-sizing: border-box; }
+  .rgg-list { flex: 1; min-height: 0; }
+  .rgg-count { color: #000; height: 16px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rgg-right { flex: none; width: 176px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .rgg-cover { width: 168px; height: 216px; border: 1px solid #000; box-shadow: 3px 3px 0 rgba(0, 0, 0, .45); background: var(--shadow); }
+  .rgg-name { font-weight: bold; text-align: center; color: #000; line-height: 15px; max-height: 30px; overflow: hidden; }
+  .rgg-made { color: var(--dark); height: 15px; }
+  .rgg-buttons { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+  .rgg-buttons button.push { width: 120px; }
+
   /* ---- menus ---- */
   .menubar { flex: none; height: 20px; display: flex; align-items: stretch; background: #fff; color: #000; border-bottom: 1px solid var(--dark); cursor: default; }
   .menubar .mt { padding: 0 6px; line-height: 19px; white-space: nowrap; }

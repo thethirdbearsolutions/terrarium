@@ -13,7 +13,8 @@ Static, no build. Three.js comes from a CDN import map.
 
 serves this repo and its siblings (`hardreturn`, `bingleball`, `magnimarbles`,
 `turtlebloom`, `webturtles`) from one origin at http://localhost:8077/, and
-the shell frames the local copies. Deployed, it frames the deployed apps.
+the shell frames the local copies. It also passes Retro Game Generator's
+feed through at `/rgg/feed.json`. Deployed, it frames the deployed apps.
 
 ## Controls
 
@@ -75,6 +76,19 @@ movement key stops a walk that's taking you somewhere.
 Where you stand, the layout, the notes on the backs, the desktop, and the
 files persist in the browser. A layout saved before the maze comes back
 with its ring standing in the starting room.
+
+## Games from Retro Game Generator
+
+Retro Game Generator, in Program Manager, lists every game in Retro Game
+Generator's public feed. Pick one to see its box. Play opens it in a
+window; Bring Home sets its box down on the floor in front of you. A box is
+as solid as a window: carry it, throw it, knock it about with a window,
+bounce the marble off it. Double-click it to play; right-click it to play
+or put it away. File ▸ Make a Game opens Retro Game Generator's own site in
+a tab, since it can't be framed.
+
+The feed is read through this site (a rewrite in `vercel.json`, and
+`tools/dev.mjs` locally), because it doesn't allow other sites to read it.
 
 ## The marble
 

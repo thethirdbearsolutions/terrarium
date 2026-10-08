@@ -3,6 +3,7 @@
 // tools/dev.mjs, every sibling repo is one origin, so local copies are used.
 
 import { art } from './icons.js';
+import { gameAppById } from './games.js';
 
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const at = (local, deployed) => (LOCAL ? local : deployed);
@@ -116,12 +117,23 @@ export const APPS = [
     }),
   },
   {
+    id: 'rgg', title: 'Retro Game Generator', w: 640, h: 470, builtin: 'rgg',
+    icon: icon((a) => {
+      // a stack of boxes, the front one standing
+      a.rect(16, 3, 14, 20, 'd'); a.box(16, 3, 14, 20, 'k'); a.rect(17, 4, 12, 5, 'n');
+      a.rect(4, 7, 16, 23, 'w'); a.box(4, 7, 16, 23, 'k'); a.rect(5, 8, 14, 7, 'R');
+      a.line(7, 10, 16, 10, 'Y'); a.line(7, 12, 13, 12, 'Y');
+      a.rect(6, 17, 12, 7, 'B'); a.rect(6, 22, 12, 2, 'g'); a.rect(11, 19, 2, 3, 'Y');
+      a.rect(5, 26, 14, 3, 'k');
+    }),
+  },
+  {
     id: 'progman', title: 'Program Manager', w: 480, h: 330, builtin: 'progman', system: true,
     icon: icon((a) => { pane(a, 2, 3, 18, 14); pane(a, 8, 9, 18, 14); pane(a, 13, 15, 18, 14, 's'); a.rect(16, 22, 4, 4, 'Y'); a.rect(22, 22, 4, 4, 'R'); }),
   },
 ].filter(a => a.builtin || a.url);
 
-export const appById = (id) => APPS.find(a => a.id === id);
+export const appById = (id) => APPS.find(a => a.id === id) || gameAppById(id);
 
 /** The app that opens a file of this name, if any. */
 export const appForName = (name) => {

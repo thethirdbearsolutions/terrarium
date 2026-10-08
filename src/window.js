@@ -7,6 +7,7 @@ import { Vector3, Quaternion } from 'three';
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { GLYPH } from './icons.js';
 import { FLOOR_Y, CEIL_Y } from './space.js';
+import { carryDrag } from './carry.js';
 import { popup, closeMenus, menuBar, offsetIn, openMenu } from './menu.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -21,10 +22,6 @@ const ICON_NEAR = 0.05;    // the icons' distance, as a fraction of D: nearer th
 const MAX_NEAR = 0.6;      // a maximized window's
 const CORNER = 20;         // how far along an edge the corner's sizing reaches
 const SHADE = 0.14;        // how much darker a window square to z is than one square to x, as with the walls
-export const CARRY = {
-  push: 260,               // screen px dragged up to carry a window e times further off
-  near: 0.4, far: 12,      // how near and far you can hold one, as shares of D
-};
 
 let nextId = 1;
 
@@ -260,49 +257,14 @@ export class Win {
     return Math.max(0.05, ahead / sp.D);
   }
 
-  /**
-   * Pick it up by the bar. It's held where it is relative to you, so it comes
-   * along as you walk; across moves it across, up pushes it away and down
-   * pulls it near. Let go while it's moving and it's thrown.
-   */
+  /** Pick it up by the bar (see carry.js); a click without a drag walks you to it. */
   barDown(e) {
     if (e.target.closest('button') || this.minimized) return;
     e.preventDefault(); e.stopPropagation();
     this.shell.focus(this);
     if (this.maximized) return;
-    const turning = e.button === 2 || e.altKey, sp = this.shell.space;
-    this.hold();
-    const c = this.carry = this.shell.carryFrom(this);
-    let px = e.clientX, py = e.clientY, moved = false;
-    const sx = px, sy = py;
-    document.body.classList.add('dragging');
-    const move = (ev) => {
-      const dx = ev.clientX - px, dy = ev.clientY - py;
-      px = ev.clientX; py = ev.clientY;
-      if (Math.abs(px - sx) + Math.abs(py - sy) > 3) moved = true;
-      if (turning) c.turn -= dx / 220;
-      else if (ev.shiftKey) {
-        // Shift: up and down raise and lower it, under the pointer
-        c.side += dx * Math.max(0.05, c.ahead / sp.D);
-        this.lift(-dy * Math.max(0.05, c.ahead / sp.D));
-      } else {
-        c.side += dx * Math.max(0.05, c.ahead / sp.D);
-        c.ahead = Math.max(sp.D * CARRY.near, Math.min(sp.D * CARRY.far, c.ahead * Math.exp(-dy / CARRY.push)));
-      }
-    };
-    // scrolling anywhere while it's held raises and lowers it
-    const wheel = (ev) => { ev.preventDefault(); ev.stopPropagation(); this.lift(-ev.deltaY * 0.6); moved = true; };
-    const up = () => {
-      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-      removeEventListener('wheel', wheel, { capture: true });
-      document.body.classList.remove('dragging');
-      this.letGo(moved);
-      // a click on the bar, not a drag: go and stand square in front of it
-      if (!moved && !turning) this.shell.bring(this);
-      this.shell.saveLayout();
-    };
-    addEventListener('pointermove', move); addEventListener('pointerup', up);
-    addEventListener('wheel', wheel, { capture: true, passive: false });
+    const turning = e.button === 2 || e.altKey;
+    carryDrag(this.shell, this, e, { turning, onClick: turning ? null : () => this.shell.bring(this) });
   }
 
   /** Raise it (or lower it, dy < 0) by dy, between the floor and the ceiling. */

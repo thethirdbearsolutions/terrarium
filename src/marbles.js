@@ -11,7 +11,6 @@
 import * as THREE from 'three';
 import { World, Marble, Magnet, ALIVE, MARBLE_RADIUS, MAGNET_RADIUS } from 'magnimarbles/physics.js';
 import { bounds } from './maze.js';
-import { THICK } from './window.js';
 
 export const MARBLES = {
   unit: 150,          // CSS px per Magnimarbles unit: the marble is 150px across
@@ -172,7 +171,7 @@ export class Marbles {
     const mags = this.world.magnets, r = MAGNET_RADIUS * U;
     if (!mags.length) return false;
     const top = this.floorY + 0.5 * U;   // a magnet stands half a unit tall
-    const hitters = [this.space.player.body, ...this.shell.inMaze().filter(w => w.slab && w.y - w.h / 2 < top).map(w => w.slab)];
+    const hitters = [this.space.player.body, ...this.shell.solids().filter(b => b.y - b.hh < top)];
     let moving = false;
     for (const m of mags) {
       m.vx ||= 0; m.vz ||= 0;
@@ -258,11 +257,10 @@ export class Marbles {
     const top = this.floorY + MARBLE_RADIUS * 2 * U, list = [];
     const p = this.space.player.body, me = this.toBoard(p.x, p.z);
     list.push({ ...me, w: p.hw * 2 / U, d: p.ht * 2 / U, a: 0, ...cap(p.vx, p.vz), restitution: MARBLES.bounce });
-    for (const win of this.shell.inMaze()) {
-      const b = win.slab;
-      if (!b || win.y - win.h / 2 > top) continue;
+    for (const b of this.shell.solids()) {
+      if (b.y - b.hh > top) continue;
       const at = this.toBoard(b.x, b.z);
-      list.push({ ...at, w: win.w / U, d: THICK / U, a: -b.yaw, ...cap(b.vx, b.vz), restitution: MARBLES.bounce, window: true });
+      list.push({ ...at, w: b.hw * 2 / U, d: b.ht * 2 / U, a: -b.yaw, ...cap(b.vx, b.vz), restitution: MARBLES.bounce, window: true });
     }
     return list;
   }

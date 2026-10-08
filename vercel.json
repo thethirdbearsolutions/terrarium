@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/rgg/feed.json", "destination": "https://retro-game-generator.fly.dev/games/feed.json" }
+  ]
+}

@@ -11,11 +11,20 @@ const REPOS = ['terrarium', 'hardreturn', 'bingleball', 'magnimarbles', 'turtleb
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain', '.wav': 'audio/wav',
   '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.bmp': 'image/bmp', '.gif': 'image/gif' };
+const RGG_FEED = 'https://retro-game-generator.fly.dev/games/feed.json';
 const port = Number(process.argv[2] || 8077);
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/') { res.writeHead(302, { location: '/terrarium/' }); return res.end(); }
+  if (url.pathname === '/rgg/feed.json') {
+    // Retro Game Generator's feed, from this origin, as vercel.json does deployed
+    try {
+      const r = await fetch(RGG_FEED);
+      res.writeHead(r.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      return res.end(Buffer.from(await r.arrayBuffer()));
+    } catch { res.writeHead(502); return res.end('[]'); }
+  }
   const path = normalize(decodeURIComponent(url.pathname)).replace(/^\/+/, '');
   const repo = path.split('/')[0];
   if (!REPOS.includes(repo) || path.split('/').some(p => p.startsWith('.'))) { res.writeHead(404); return res.end('not here'); }
